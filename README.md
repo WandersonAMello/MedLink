@@ -11,7 +11,7 @@
 
 **Integrantes do Projeto**  
 - Mauricio Monteiro
-- Mello
+- Wanderson Mello
 - Letícia Gomes
 - Gabryel Marques 
 - Jose Borges 
