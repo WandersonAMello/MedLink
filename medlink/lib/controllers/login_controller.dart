@@ -29,15 +29,32 @@ class LoginController {
 
     return true;
   }
+  // ####### Descomente a função abaixo quando a API estiver pronta ########/////
+  // Future<bool> login(String cpf, String senha) async {
+  //   final user = User(cpf: cpf, senha: senha);
 
+  //   final response = await _apiService.login(user);
+  //   if (response.statusCode == 200) {
+  //     return true;
+  //   } else {
+  //     return false;
+  //   }
+  // }
+
+  // Função de login "mockada" para desenvolvimento do frontend
   Future<bool> login(String cpf, String senha) async {
-    final user = User(cpf: cpf, senha: senha);
+    // 1. Adicionamos um print para sabermos que a função foi chamada
+    print("Tentando login com CPF: $cpf");
 
-    final response = await _apiService.login(user);
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      return false;
-    }
+    // 2. Não chama mais a API real, pois ela não existe ainda.
+    //    final user = User(cpf: cpf, senha: senha);
+    //    final response = await _apiService.login(user);
+
+    // 3. Simula uma espera de rede (como se estivesse falando com o servidor)
+    //    Isso faz a experiência ser mais realista.
+    await Future.delayed(const Duration(seconds: 1));
+
+    // 4. Retorna 'true' diretamente, fingindo que o login foi um sucesso.
+    return true;
   }
 }
