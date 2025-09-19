@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../controllers/login_controller.dart';
+//import 'dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,9 +20,9 @@ class _LoginPageState extends State<LoginPage> {
 
     if (!_loginController.validarCPF(cpf)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("CPF inválido")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("CPF inválido")));
       return;
     }
 
@@ -34,7 +35,7 @@ class _LoginPageState extends State<LoginPage> {
         const SnackBar(content: Text("Login realizado com sucesso!")),
       );
       // Navegação segura
-      // Navigator.pushReplacementNamed(context, "/home");
+      Navigator.pushReplacementNamed(context, "/home");
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Usuário ou senha incorretos")),
@@ -51,10 +52,7 @@ class _LoginPageState extends State<LoginPage> {
       body: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 500,
-              maxHeight: 620
-            ),
+            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 620),
             child: Card(
               elevation: 6,
               shape: RoundedRectangleBorder(
@@ -83,7 +81,10 @@ class _LoginPageState extends State<LoginPage> {
                     const Text(
                       "Realizar Login",
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 24),
 
@@ -97,15 +98,24 @@ class _LoginPageState extends State<LoginPage> {
                         prefixIcon: Icon(Icons.badge),
                         hintText: "000.000.000-00",
                         border: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0xFF5BBCDC)), // cor padrão
-                          borderRadius: BorderRadius.circular(8), // opcional: arredondar borda
+                          borderSide: const BorderSide(
+                            color: Color(0xFF5BBCDC),
+                          ), // cor padrão
+                          borderRadius: BorderRadius.circular(
+                            8,
+                          ), // opcional: arredondar borda
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0xFF5BBCDC), width: 2), // quando selecionado
+                          borderSide: const BorderSide(
+                            color: Color(0xFF5BBCDC),
+                            width: 2,
+                          ), // quando selecionado
                           borderRadius: BorderRadius.circular(8),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0xFF5BBCDC)), // quando não selecionado
+                          borderSide: const BorderSide(
+                            color: Color(0xFF5BBCDC),
+                          ), // quando não selecionado
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
@@ -122,20 +132,29 @@ class _LoginPageState extends State<LoginPage> {
                         prefixIcon: const Icon(Icons.lock),
                         hintText: "********",
                         border: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0xFF5BBCDC)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF5BBCDC),
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0xFF5BBCDC)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF5BBCDC),
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(color: Color(0xFF5BBCDC), width: 2),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF5BBCDC),
+                            width: 2,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                           ),
                           onPressed: () {
                             setState(() {
@@ -161,25 +180,38 @@ class _LoginPageState extends State<LoginPage> {
                     ElevatedButton(
                       onPressed: _onLoginPressed,
                       style: ButtonStyle(
-                        backgroundColor: WidgetStateProperty.resolveWith<Color?>(
-                          (Set<WidgetState> states) {
-                            if (states.contains(WidgetState.hovered)) {
-                              return const Color(0xFF166580); // hover
-                            }
-                            return const Color(0xFF1D80A1); // normal
-                          },
+                        backgroundColor:
+                            WidgetStateProperty.resolveWith<Color?>((
+                              Set<WidgetState> states,
+                            ) {
+                              if (states.contains(WidgetState.hovered)) {
+                                return const Color(0xFF166580); // hover
+                              }
+                              return const Color(0xFF1D80A1); // normal
+                            }),
+                        foregroundColor: WidgetStateProperty.all<Color>(
+                          Colors.white,
                         ),
-                        foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
                         padding: WidgetStateProperty.all<EdgeInsets>(
-                          const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                          const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 14,
+                          ),
                         ),
                         shape: WidgetStateProperty.all<OutlinedBorder>(
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         textStyle: WidgetStateProperty.all<TextStyle>(
-                          const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        mouseCursor: WidgetStateProperty.all<MouseCursor>(WidgetStateMouseCursor.clickable),
+                        mouseCursor: WidgetStateProperty.all<MouseCursor>(
+                          WidgetStateMouseCursor.clickable,
+                        ),
                       ),
                       child: const Text("Entrar"),
                     ),
@@ -192,25 +224,38 @@ class _LoginPageState extends State<LoginPage> {
                     ElevatedButton(
                       onPressed: () {},
                       style: ButtonStyle(
-                        backgroundColor: WidgetStateProperty.resolveWith<Color?>(
-                          (Set<WidgetState> states) {
-                            if (states.contains(WidgetState.hovered)) {
-                              return const Color(0xFF317714); // hover
-                            }
-                            return const Color(0xFF42A01C); // normal
-                          },
+                        backgroundColor:
+                            WidgetStateProperty.resolveWith<Color?>((
+                              Set<WidgetState> states,
+                            ) {
+                              if (states.contains(WidgetState.hovered)) {
+                                return const Color(0xFF317714); // hover
+                              }
+                              return const Color(0xFF42A01C); // normal
+                            }),
+                        foregroundColor: WidgetStateProperty.all<Color>(
+                          Colors.white,
                         ),
-                        foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
                         padding: WidgetStateProperty.all<EdgeInsets>(
-                          const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                          const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 14,
+                          ),
                         ),
                         shape: WidgetStateProperty.all<OutlinedBorder>(
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         textStyle: WidgetStateProperty.all<TextStyle>(
-                          const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        mouseCursor: WidgetStateProperty.all<MouseCursor>(WidgetStateMouseCursor.clickable),
+                        mouseCursor: WidgetStateProperty.all<MouseCursor>(
+                          WidgetStateMouseCursor.clickable,
+                        ),
                       ),
                       child: const Text("Cadastrar-se"),
                     ),
