@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart'; // Adicione este import
 import 'views/pages/login.dart';
 import 'views/pages/dashboard_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('pt_BR', null); // Inicializa a localização
   runApp(const MyApp());
 }
 
+// ...existing code...
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -20,9 +25,17 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
 
       // Define todas as rotas do seu app
+      // ...existing code...
       routes: {
-        '/': (context) => const LoginPage(), // Rota inicial
-        '/home': (context) => const HomeScreen(), // Rota do dashboard
+        '/': (context) => const LoginPage(),
+        '/home': (context) => SecretaryDashboard(
+          onLogout: () {
+            Navigator.pushReplacementNamed(context, '/');
+          },
+          onNavigateToNewPatient: () {
+            Navigator.pushNamed(context, '/new-patient');
+          },
+        ),
       },
     );
   }
