@@ -23,7 +23,7 @@ def password_reset_token_created_handler(sender, instance, reset_password_token,
         f"Por favor, clique no link abaixo ou copie e cole no seu navegador para completar o processo:\n\n"
         f"{reset_url}\n\n"
         f"Se não pediu uma redefinição de senha, por favor ignore este email.\n\n"
-        f"Atenciosamente,\nEquipa MedLink"
+        f"Atenciosamente,\nEquipe MedLink"
     )
 
     print("\n\n=======================================================")
