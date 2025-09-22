@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart'; // Adicione este import
 import 'views/pages/login.dart';
+import 'views/pages/register.dart';
 import 'views/pages/dashboard_page.dart';
 
 void main() async {
@@ -28,13 +29,11 @@ class MyApp extends StatelessWidget {
       // ...existing code...
       routes: {
         '/': (context) => const LoginPage(),
+        '/register': (context) => const RegisterPage(),
         '/home': (context) => SecretaryDashboard(
           onLogout: () {
             Navigator.pushReplacementNamed(context, '/');
-          },
-          onNavigateToNewPatient: () {
-            Navigator.pushNamed(context, '/new-patient');
-          },
+          }
         ),
       },
     );

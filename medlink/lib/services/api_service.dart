@@ -13,4 +13,18 @@ class ApiService {
       body: jsonEncode(user.toJson()),
     );
   }
+
+  Future<bool> register(User user) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/register"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(user.toJson()),
+    );
+
+    if (response.statusCode == 200) {
+      return true; // cadastro ok
+    } else {
+      return false; // falha
+    }
+  }
 }
