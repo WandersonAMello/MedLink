@@ -222,7 +222,9 @@ class _LoginPageState extends State<LoginPage> {
 
                     // Botão Cadastrar-se
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/register');
+                      },
                       style: ButtonStyle(
                         backgroundColor:
                             WidgetStateProperty.resolveWith<Color?>((

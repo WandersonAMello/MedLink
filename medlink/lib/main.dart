@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'views/pages/login.dart';
+import 'views/pages/register.dart';
 import 'views/pages/dashboard_page.dart';
 
 void main() {
@@ -22,6 +23,7 @@ class MyApp extends StatelessWidget {
       // Define todas as rotas do seu app
       routes: {
         '/': (context) => const LoginPage(), // Rota inicial
+        '/register': (context) => const RegisterPage(),
         '/home': (context) => const HomeScreen(), // Rota do dashboard
       },
     );
