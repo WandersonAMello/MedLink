@@ -1,425 +1,686 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-// Classe principal da tela, que constrói o layout geral
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+// Model para consulta
+class Appointment {
+  final String id;
+  final String time;
+  final String patient;
+  final String doctor;
+  final String type;
+  AppointmentStatus status;
 
-  @override
-  Widget build(BuildContext context) {
-    // Scaffold é a base para a maioria das telas no Material Design
-    return const Scaffold(
-      backgroundColor: Color(0xFFF5F5F5), // exemplo de cinza claro
-      body: Row(
-        children: [
-          // A barra lateral ocupa uma largura fixa
-          _Sidebar(),
-          // O conteúdo principal ocupa o resto do espaço
-          Expanded(child: MainContent()),
-        ],
-      ),
-    );
-  }
-}
-
-// Widget privado para a barra lateral de navegação
-class _Sidebar extends StatelessWidget {
-  const _Sidebar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 260,
-      color: Colors.white,
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Logo
-          Padding(
-            padding: const EdgeInsets.only(bottom: 32.0),
-            child: Image.asset('assets/images/Logo.png', height: 40),
-          ),
-
-          // Itens de Navegação
-          const _NavigationLink(
-            icon: Icons.dashboard,
-            label: 'Dashboard',
-            isActive: true,
-          ),
-          const _NavigationLink(
-            icon: Icons.calendar_today,
-            label: 'Agendamentos',
-          ),
-          const _NavigationLink(icon: Icons.group, label: 'Pacientes'),
-          const _NavigationLink(
-            icon: Icons.medical_services,
-            label: 'Profissionais',
-          ),
-          const _NavigationLink(icon: Icons.bar_chart, label: 'Relatórios'),
-
-          // Espaçador para empurrar o rodapé para baixo
-          const Spacer(),
-
-          // Rodapé com informações do usuário
-          const Divider(height: 32),
-          const Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ana da Silva',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'Secretária',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-              Spacer(),
-              Icon(Icons.logout, color: Colors.grey),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Widget privado para criar os links de navegação
-class _NavigationLink extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isActive;
-
-  const _NavigationLink({
-    required this.icon,
-    required this.label,
-    this.isActive = false,
+  Appointment({
+    required this.id,
+    required this.time,
+    required this.patient,
+    required this.doctor,
+    required this.type,
+    required this.status,
   });
+}
+
+enum AppointmentStatus { confirmed, pending, cancelled }
+
+class SecretaryDashboard extends StatefulWidget {
+  final VoidCallback? onLogout;
+  final VoidCallback? onNavigateToNewPatient;
+
+  const SecretaryDashboard({
+    Key? key,
+    this.onLogout,
+    this.onNavigateToNewPatient,
+  }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      decoration: BoxDecoration(
-        color: isActive ? const Color(0xFF1D80A1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: isActive ? Colors.white : Colors.grey.shade600,
-            size: 24,
-          ),
-          const SizedBox(width: 16.0),
-          Text(
-            label,
-            style: TextStyle(
-              color: isActive ? Colors.white : Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+  State<SecretaryDashboard> createState() => _SecretaryDashboardState();
+}
+
+class _SecretaryDashboardState extends State<SecretaryDashboard> {
+  bool _isNewAppointmentOpen = false;
+  String _cancelReason = '';
+  Appointment? _selectedAppointment;
+
+  // Mock data - consultas do dia
+  final List<Appointment> _appointments = [
+    Appointment(
+      id: '1',
+      time: '09:00',
+      patient: 'Maria Silva',
+      doctor: 'Dr. João Santos',
+      type: 'Consulta Geral',
+      status: AppointmentStatus.confirmed,
+    ),
+    Appointment(
+      id: '2',
+      time: '10:30',
+      patient: 'Carlos Oliveira',
+      doctor: 'Dra. Ana Costa',
+      type: 'Retorno',
+      status: AppointmentStatus.pending,
+    ),
+    Appointment(
+      id: '3',
+      time: '14:00',
+      patient: 'Lucia Pereira',
+      doctor: 'Dr. Pedro Lima',
+      type: 'Primeira Consulta',
+      status: AppointmentStatus.confirmed,
+    ),
+    Appointment(
+      id: '4',
+      time: '15:30',
+      patient: 'Roberto Santos',
+      doctor: 'Dra. Maria Fernandes',
+      type: 'Exame',
+      status: AppointmentStatus.pending,
+    ),
+  ];
+
+  // Cores do tema médico
+  static const Color primaryColor = Color(0xFF0891B2);
+  static const Color secondaryColor = Color(0xFF67E8F9);
+  static const Color accentColor = Color(0xFFE0F2FE);
+  static const Color backgroundColor = Color(0xFFF8FAFC);
+
+  // Configurações de status
+  Map<String, dynamic> _getStatusConfig(AppointmentStatus status) {
+    switch (status) {
+      case AppointmentStatus.confirmed:
+        return {'label': 'Confirmada', 'color': Colors.green};
+      case AppointmentStatus.pending:
+        return {'label': 'Pendente', 'color': Colors.orange};
+      case AppointmentStatus.cancelled:
+        return {'label': 'Cancelada', 'color': Colors.red};
+    }
+  }
+
+  // Estatísticas
+  Map<String, int> get _stats {
+    return {
+      'today': _appointments.length,
+      'confirmed': _appointments
+          .where((a) => a.status == AppointmentStatus.confirmed)
+          .length,
+      'pending': _appointments
+          .where((a) => a.status == AppointmentStatus.pending)
+          .length,
+      'totalMonth': 127, // Mock data
+    };
+  }
+
+  // Confirmar consulta
+  void _confirmAppointment(String appointmentId) {
+    setState(() {
+      final index = _appointments.indexWhere((a) => a.id == appointmentId);
+      if (index != -1) {
+        _appointments[index].status = AppointmentStatus.confirmed;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Consulta confirmada com sucesso!'),
+        backgroundColor: primaryColor,
       ),
     );
   }
-}
 
-// Widget para o conteúdo principal da página
-class MainContent extends StatelessWidget {
-  const MainContent({super.key});
+  // Mostrar dialog de cancelamento
+  void _showCancelDialog(Appointment appointment) {
+    setState(() {
+      _selectedAppointment = appointment;
+      _cancelReason = '';
+    });
+
+    showDialog(context: context, builder: (context) => _buildCancelDialog());
+  }
+
+  // Cancelar consulta
+  void _cancelAppointment() {
+    if (_selectedAppointment != null) {
+      setState(() {
+        final index = _appointments.indexWhere(
+          (a) => a.id == _selectedAppointment!.id,
+        );
+        if (index != -1) {
+          _appointments[index].status = AppointmentStatus.cancelled;
+        }
+      });
+
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Consulta cancelada com sucesso!'),
+          backgroundColor: primaryColor,
+        ),
+      );
+    }
+  }
+
+  // Editar consulta
+  void _editAppointment(String appointmentId) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Funcionalidade de edição em desenvolvimento'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  // Formatar data de hoje
+  String get _todayFormatted {
+    final now = DateTime.now();
+    return DateFormat('EEEE, d \'de\' MMMM \'de\' y', 'pt_BR').format(now);
+  }
 
   @override
   Widget build(BuildContext context) {
-    // SingleChildScrollView permite que o conteúdo role se for maior que a tela
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(32.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header com a barra de pesquisa e botão
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Barra de Pesquisa
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Pesquisar por paciente...',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 24.0),
-              // Botão Novo Agendamento
-              ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add, color: Colors.white),
-                label: const Text(
-                  'Novo Agendamento',
-                  style: TextStyle(color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1D80A1),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                ),
-              ),
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              accentColor.withOpacity(0.3),
+              backgroundColor,
+              secondaryColor.withOpacity(0.2),
             ],
           ),
-          const SizedBox(height: 32.0),
-
-          // Cards de Estatísticas
-          const Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  title: 'Hoje',
-                  value: '12',
-                  icon: Icons.calendar_today,
-                  iconColor: Color(0xFF1D80A1),
-                  bgColor: Color(0xFFE6F7FF),
-                ),
-              ),
-              SizedBox(width: 24.0),
-              Expanded(
-                child: _StatCard(
-                  title: 'Confirmadas',
-                  value: '8',
-                  icon: Icons.check_circle,
-                  iconColor: Color(0xFF00A97E),
-                  bgColor: Color(0xFFE6FFFA),
-                ),
-              ),
-              SizedBox(width: 24.0),
-              Expanded(
-                child: _StatCard(
-                  title: 'Pendentes',
-                  value: '2',
-                  icon: Icons.hourglass_top,
-                  iconColor: Color(0xFFFFC53D),
-                  bgColor: Color(0xFFFFFBE6),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32.0),
-
-          // Widget da Agenda do Dia
-          Container(
-            padding: const EdgeInsets.all(24.0),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12.0),
-            ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Agenda de Hoje',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const Text(
-                  'terça-feira, 16 de setembro de 2025',
-                  style: TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 24.0),
-                // Exemplo de Agendamento Pendente
-                _AppointmentItemCard(
-                  time: '15:00',
-                  patient: 'Ana Costa',
-                  doctor: 'Dra. Maria Souza',
-                  status: 'Pendente',
-                ),
-                const Divider(height: 24.0),
-                // Exemplo de Agendamento Confirmado
-                _AppointmentItemCard(
-                  time: '14:00',
-                  patient: 'Carlos Oliveira',
-                  doctor: 'Dr. João Silva',
-                  status: 'Confirmado',
+                _buildHeader(),
+                SizedBox(height: 24),
+                _buildStatsCards(),
+                SizedBox(height: 24),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 2, child: _buildTodaySchedule()),
+                      SizedBox(width: 16),
+                      Expanded(flex: 1, child: _buildQuickActions()),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
-}
 
-// Widget para os cards de estatísticas
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color iconColor;
-  final Color bgColor;
-
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.iconColor,
-    required this.bgColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            spreadRadius: 1,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 25,
-            backgroundColor: bgColor,
-            child: Icon(icon, color: iconColor),
-          ),
-          const SizedBox(width: 16.0),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(color: Colors.grey)),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Widget para cada item da lista de agendamento
-class _AppointmentItemCard extends StatelessWidget {
-  final String time;
-  final String patient;
-  final String doctor;
-  final String status;
-
-  const _AppointmentItemCard({
-    required this.time,
-    required this.patient,
-    required this.doctor,
-    required this.status,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isPending = status == 'Pendente';
-    final statusColor = isPending
-        ? const Color(0xFFD4A017)
-        : const Color(0xFF00A97E);
-    final statusBgColor = isPending
-        ? const Color(0xFFFFFBE6)
-        : const Color(0xFFE6FFFA);
-
+  // Header
+  Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            Text(
-              time,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1D80A1),
-              ),
-            ),
-            const SizedBox(width: 24.0),
+            Icon(Icons.local_hospital, size: 32, color: primaryColor),
+            SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  patient,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  'MedLink',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
                 ),
                 Text(
-                  doctor,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  'Painel da Secretária',
+                  style: TextStyle(color: Colors.grey[600]),
                 ),
               ],
             ),
-            const SizedBox(width: 24.0),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusBgColor,
-                borderRadius: BorderRadius.circular(20.0),
-              ),
-              child: Text(
-                status,
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
           ],
         ),
-
-        // Botões de Ação
         Row(
           children: [
-            if (isPending) ...[
-              TextButton(
-                onPressed: () {},
-                child: const Text(
-                  'Confirmar',
-                  style: TextStyle(color: Color(0xFF00A97E)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Bem-vindo, Ana Silva',
+                  style: TextStyle(fontWeight: FontWeight.w500),
                 ),
-              ),
-              const SizedBox(width: 8),
-            ],
-            TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Cancelar',
-                style: TextStyle(color: Colors.red),
-              ),
+                Text(
+                  'Secretária',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.edit, color: Color(0xFF1D80A1)),
+            SizedBox(width: 12),
+            OutlinedButton.icon(
+              onPressed: widget.onLogout,
+              icon: Icon(Icons.logout, size: 16),
+              label: Text('Sair'),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  // Cards de estatísticas
+  Widget _buildStatsCards() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            'Hoje',
+            _stats['today']!,
+            Icons.calendar_today,
+            primaryColor,
+          ),
+        ),
+        SizedBox(width: 16),
+        Expanded(
+          child: _buildStatCard(
+            'Confirmadas',
+            _stats['confirmed']!,
+            Icons.check_circle,
+            Colors.green,
+          ),
+        ),
+        SizedBox(width: 16),
+        Expanded(
+          child: _buildStatCard(
+            'Pendentes',
+            _stats['pending']!,
+            Icons.access_time,
+            Colors.orange,
+          ),
+        ),
+        SizedBox(width: 16),
+        Expanded(
+          child: _buildStatCard(
+            'Total Mês',
+            _stats['totalMonth']!,
+            Icons.local_hospital,
+            primaryColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String title, int value, IconData icon, Color color) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  Text(
+                    value.toString(),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Agenda do dia
+  Widget _buildTodaySchedule() {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header da agenda
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today, color: primaryColor),
+                        SizedBox(width: 8),
+                        Text(
+                          'Agenda de Hoje',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      _todayFormatted,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _showNewAppointmentDialog(),
+                  icon: Icon(Icons.add),
+                  label: Text('Nova Consulta'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
+
+            // Lista de consultas
+            Expanded(
+              child: ListView.builder(
+                itemCount: _appointments.length,
+                itemBuilder: (context, index) {
+                  final appointment = _appointments[index];
+                  return _buildAppointmentCard(appointment);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Card de consulta
+  Widget _buildAppointmentCard(Appointment appointment) {
+    final statusConfig = _getStatusConfig(appointment.status);
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+      ),
+      child: Row(
+        children: [
+          // Horário
+          Column(
+            children: [
+              Icon(Icons.access_time, color: primaryColor, size: 16),
+              SizedBox(height: 4),
+              Text(
+                appointment.time,
+                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+              ),
+            ],
+          ),
+          SizedBox(width: 16),
+
+          // Informações da consulta
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appointment.patient,
+                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                ),
+                Text(
+                  appointment.doctor,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                Text(
+                  appointment.type,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+
+          // Ações e status
+          Column(
+            children: [
+              // Botões de ação
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (appointment.status == AppointmentStatus.pending)
+                    Container(
+                      width: 32,
+                      height: 32,
+                      margin: EdgeInsets.only(right: 4),
+                      child: IconButton(
+                        onPressed: () => _confirmAppointment(appointment.id),
+                        icon: Icon(Icons.check, size: 16, color: Colors.green),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.green[50],
+                          side: BorderSide(color: Colors.green[200]!),
+                        ),
+                      ),
+                    ),
+                  if (appointment.status != AppointmentStatus.cancelled)
+                    Container(
+                      width: 32,
+                      height: 32,
+                      margin: EdgeInsets.only(right: 4),
+                      child: IconButton(
+                        onPressed: () => _showCancelDialog(appointment),
+                        icon: Icon(Icons.close, size: 16, color: Colors.red),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.red[50],
+                          side: BorderSide(color: Colors.red[200]!),
+                        ),
+                      ),
+                    ),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    child: IconButton(
+                      onPressed: () => _editAppointment(appointment.id),
+                      icon: Icon(Icons.edit, size: 16, color: Colors.blue),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.blue[50],
+                        side: BorderSide(color: Colors.blue[200]!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+
+              // Badge de status
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusConfig['color'].withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  statusConfig['label'],
+                  style: TextStyle(
+                    color: statusConfig['color'],
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Ações rápidas
+  Widget _buildQuickActions() {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Ações Rápidas',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+
+            _buildActionButton(
+              'Nova Consulta',
+              Icons.add,
+              primaryColor,
+              () => _showNewAppointmentDialog(),
+              isPrimary: true,
+            ),
+            SizedBox(height: 12),
+
+            _buildActionButton(
+              'Novo Paciente',
+              Icons.person_add,
+              Colors.grey[700]!,
+              widget.onNavigateToNewPatient ?? () {},
+            ),
+            SizedBox(height: 12),
+
+            _buildActionButton(
+              'Ver Agenda Completa',
+              Icons.calendar_view_day,
+              Colors.grey[700]!,
+              () {
+                // Implementar navegação para agenda completa
+              },
+            ),
+            SizedBox(height: 12),
+
+            _buildActionButton(
+              'Lista de Pacientes',
+              Icons.people,
+              Colors.grey[700]!,
+              () {
+                // Implementar navegação para lista de pacientes
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onPressed, {
+    bool isPrimary = false,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 20),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isPrimary ? color : Colors.white,
+          foregroundColor: isPrimary ? Colors.white : color,
+          side: isPrimary ? null : BorderSide(color: Colors.grey[300]!),
+          alignment: Alignment.centerLeft,
+        ),
+      ),
+    );
+  }
+
+  // Dialog de cancelamento
+  Widget _buildCancelDialog() {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.warning, color: Colors.orange),
+          SizedBox(width: 8),
+          Text('Cancelar Consulta'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Você tem certeza que deseja cancelar esta consulta? Esta ação não pode ser desfeita.',
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Motivo do cancelamento (opcional)',
+            style: TextStyle(fontWeight: FontWeight.w500),
+          ),
+          SizedBox(height: 8),
+          TextField(
+            onChanged: (value) => _cancelReason = value,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Descreva o motivo do cancelamento...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _cancelAppointment,
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          child: Text(
+            'Confirmar Cancelamento',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Dialog de nova consulta (placeholder)
+  void _showNewAppointmentDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Nova Consulta'),
+        content: Text('Modal de nova consulta será implementado aqui.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Fechar'),
+          ),
+        ],
+      ),
     );
   }
 }
