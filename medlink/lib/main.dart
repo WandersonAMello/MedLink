@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart'; // Adicione este import
 import 'views/pages/login.dart';
 import 'views/pages/register.dart';
 import 'views/pages/dashboard_page.dart';
+import 'views/pages/admin.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,10 +31,11 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
+        '/admin': (context) => const AdminDashboard(),
         '/home': (context) => SecretaryDashboard(
           onLogout: () {
             Navigator.pushReplacementNamed(context, '/');
-          }
+          },
         ),
       },
     );
