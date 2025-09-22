@@ -61,7 +61,7 @@ class RegisterController {
       email: email,
       telefone: telefone,
       senha: senha,
-      tipo: "paciente",
+      tipo: "Paciente",
     );
 
     // Enviar para o backend
