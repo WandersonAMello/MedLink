@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
 
 class ApiService {
-  final String baseUrl = "http://seu-backend.com/api";
+  final String baseUrl = "http://127.0.0.1:8000/";
 
   Future<http.Response> login(User user) async {
     final url = Uri.parse("$baseUrl/login");
