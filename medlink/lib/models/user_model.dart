@@ -22,7 +22,7 @@ class User {
       "email": email,
       "telefone": telefone,
       "senha": senha,
-      "tipo": tipo ?? "paciente", // por padrão, no app mobile será paciente
+      "tipo": tipo ?? "Paciente", // por padrão, no app mobile será paciente
     };
   }
 }

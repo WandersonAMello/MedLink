@@ -27,4 +27,7 @@ urlpatterns = [
     path('api/pacientes/', include('pacientes.urls')),
     path('api/password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
     path('api/agendamentos/', include('agendamentos.urls')),
+
+    path('admin/', admin.site.urls),
+    path('', include('users.urls')),  # adiciona as rotas do app usuarios
 ]
