@@ -1,15 +1,23 @@
-import '../models/user_model.dart';
+// lib/controllers/login_controller.dart (Versão Corrigida)
+
+import 'dart:convert';
 import '../services/api_service.dart';
 
 class LoginController {
   final ApiService _apiService = ApiService();
 
-  bool validarCPF(String cpf) {
-    cpf = cpf.replaceAll(RegExp(r'[^0-9]'), '');
-    if (cpf.length != 11) return false;
-    if (RegExp(r'^(\d)\1{10}$').hasMatch(cpf)) return false;
+  // Função interna para remover a formatação do CPF
+  String _limparCPF(String cpf) {
+    return cpf.replaceAll(RegExp(r'[^0-9]'), '');
+  }
 
-    List<int> numbers = cpf.split('').map(int.parse).toList();
+  bool validarCPF(String cpf) {
+    final cpfLimpo = _limparCPF(cpf); // Usa a função de limpeza
+
+    if (cpfLimpo.length != 11) return false;
+    if (RegExp(r'^(\d)\1{10}$').hasMatch(cpfLimpo)) return false;
+
+    List<int> numbers = cpfLimpo.split('').map(int.parse).toList();
 
     int soma1 = 0;
     for (int i = 0; i < 9; i++) {
@@ -29,32 +37,22 @@ class LoginController {
 
     return true;
   }
-  // ####### Descomente a função abaixo quando a API estiver pronta ########/////
-  // Future<bool> login(String cpf, String senha) async {
-  //   final user = User(cpf: cpf, senha: senha);
 
-  //   final response = await _apiService.login(user);
-  //   if (response.statusCode == 200) {
-  //     return true;
-  //   } else {
-  //     return false;
-  //   }
-  // }
-
-  // Função de login "mockada" para desenvolvimento do frontend
   Future<bool> login(String cpf, String senha) async {
-    // 1. Adicionamos um print para sabermos que a função foi chamada
-    print("Tentando login com CPF: $cpf");
+    // 1. Limpa o CPF antes de enviar para a API
+    final cpfLimpo = _limparCPF(cpf);
 
-    // 2. Não chama mais a API real, pois ela não existe ainda.
-    //    final user = User(cpf: cpf, senha: senha);
-    //    final response = await _apiService.login(user);
+    // 2. Envia o CPF limpo para o serviço
+    final response = await _apiService.login(cpfLimpo, senha);
 
-    // 3. Simula uma espera de rede (como se estivesse falando com o servidor)
-    //    Isso faz a experiência ser mais realista.
-    await Future.delayed(const Duration(seconds: 1));
-
-    // 4. Retorna 'true' diretamente, fingindo que o login foi um sucesso.
-    return true;
+    if (response.statusCode == 200) {
+      final responseBody = jsonDecode(response.body);
+      print('Login bem-sucedido! Token de acesso: ${responseBody['access']}');
+      return true;
+    } else {
+      print('Erro no login: ${response.statusCode}');
+      print('Corpo da resposta: ${response.body}');
+      return false;
+    }
   }
 }

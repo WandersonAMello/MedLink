@@ -1,18 +1,19 @@
+// lib/main.dart
+
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart'; // Adicione este import
+import 'package:intl/date_symbol_data_local.dart';
 import 'views/pages/login.dart';
 import 'views/pages/register.dart';
 import 'views/pages/dashboard_page.dart';
 import 'views/pages/admin.dart';
+import 'views/pages/home_page.dart'; // 1. ADICIONE ESTA IMPORTAÇÃO
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('pt_BR', null); // Inicializa a localização
+  await initializeDateFormatting('pt_BR', null);
   runApp(const MyApp());
 }
 
-// ...existing code...
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -22,21 +23,12 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'MedLink',
       theme: ThemeData(primarySwatch: Colors.blue),
-
-      // Define a tela inicial
       initialRoute: '/',
-
-      // Define todas as rotas do seu app
-      // ...existing code...
       routes: {
         '/': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
+        '/home': (context) => const HomePage(),
         '/admin': (context) => const AdminDashboard(),
-        '/home': (context) => SecretaryDashboard(
-          onLogout: () {
-            Navigator.pushReplacementNamed(context, '/');
-          },
-        ),
       },
     );
   }
