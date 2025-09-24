@@ -1,30 +1,36 @@
+// lib/services/api_service.dart (Corrigido)
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
 
 class ApiService {
-  final String baseUrl = "http://127.0.0.1:8000";
+  final String baseUrl = "http://10.0.2.2:8000";
 
-  Future<http.Response> login(User user) async {
-    final url = Uri.parse("$baseUrl/login/");
+  // A função de login foi ajustada para enviar os campos que o backend espera
+  Future<http.Response> login(String cpf, String password) async {
+    final url = Uri.parse("$baseUrl/api/token/"); // CORREÇÃO: URL correta
     return await http.post(
       url,
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode(user.toJson()),
+      // CORREÇÃO: O backend espera 'cpf' e 'password'
+      body: jsonEncode({
+        "cpf": cpf,
+        "password": password,
+      }),
     );
   }
 
   Future<bool> register(User user) async {
     final response = await http.post(
-      Uri.parse("$baseUrl/register/"),
+      Uri.parse("$baseUrl/api/register/"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode(user.toJson()),
     );
 
-    if (response.statusCode == 200) {
-      return true; // cadastro ok
+    if (response.statusCode == 201) { // CORREÇÃO da análise anterior
+      return true;
     } else {
-      return false; // falha
+      return false;
     }
   }
 }
