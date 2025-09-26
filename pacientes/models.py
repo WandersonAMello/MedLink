@@ -1,14 +1,20 @@
 # pacientes/models.py
 from django.db import models
+from users.models import User
 
-# pacientes/models.py
-class Paciente(models.Model):
-    nome_completo = models.CharField(max_length=255)
-    data_nascimento = models.DateField()
-    cpf = models.CharField(max_length=11, unique=True)
+# Modelo Paciente que herda do User
+class Paciente(User):
+    # Campos que já existem no User (email, etc)
     telefone = models.CharField(max_length=15)
-    email = models.EmailField(unique=True)  # <- adicione
     data_cadastro = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.nome_completo
+        return self.get_full_name()
+
+    def nome_completo(self):
+        return f"{self.first_name} {self.last_name}"
+    nome_completo.short_description = 'Nome Completo'
+
+    class Meta:
+        verbose_name = 'Paciente'
+        verbose_name_plural = 'Pacientes'
