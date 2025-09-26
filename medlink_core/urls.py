@@ -17,17 +17,17 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include 
 
-from users.views import MyTokenObtainPairView 
+from users.views import MyTokenObtainPairView
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    # Rota para as operações de pacientes. O registro agora está dentro deste app.
     path('api/pacientes/', include('pacientes.urls')),
-    path('api/password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
-    path('api/agendamentos/', include('agendamentos.urls')),
 
-    path('admin/', admin.site.urls),
-    path('', include('users.urls')),  # adiciona as rotas do app usuarios
+    path('api/agendamentos/', include('agendamentos.urls')),
+    path('api/password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
 ]
