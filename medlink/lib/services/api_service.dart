@@ -1,18 +1,19 @@
-// lib/services/api_service.dart (Corrigido)
+// lib/services/api_service.dart
+
 import 'dart:convert';
+import 'package:flutter/foundation.dart'; // 1. IMPORTE A BIBLIOTECA
 import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
 
 class ApiService {
-  final String baseUrl = "http://10.0.2.2:8000";
+  // 2. USE A LÓGICA PARA DEFINIR A URL AUTOMATICAMENTE
+  final String baseUrl = kIsWeb ? "http://127.0.0.1:8000" : "http://10.0.2.2:8000";
 
-  // A função de login foi ajustada para enviar os campos que o backend espera
   Future<http.Response> login(String cpf, String password) async {
-    final url = Uri.parse("$baseUrl/api/token/"); // CORREÇÃO: URL correta
+    final url = Uri.parse("$baseUrl/api/token/");
     return await http.post(
       url,
       headers: {"Content-Type": "application/json"},
-      // CORREÇÃO: O backend espera 'cpf' e 'password'
       body: jsonEncode({
         "cpf": cpf,
         "password": password,
@@ -27,7 +28,7 @@ class ApiService {
       body: jsonEncode(user.toJson()),
     );
 
-    if (response.statusCode == 201) { // CORREÇÃO da análise anterior
+    if (response.statusCode == 201) {
       return true;
     } else {
       return false;
