@@ -7,15 +7,15 @@ class RegisterController {
 
   Future<void> register(
     BuildContext context, {
-    required String nome,
+    required String username,
     required String cpf,
     required String email,
     required String telefone,
-    required String senha,
+    required String password,
     required String confirmarSenha,
   }) async {
     // Validação de campos obrigatórios
-    if (nome.isEmpty || cpf.isEmpty || email.isEmpty || telefone.isEmpty || senha.isEmpty) {
+    if (username.isEmpty || cpf.isEmpty || email.isEmpty || telefone.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Preencha todos os campos")),
       );
@@ -23,7 +23,7 @@ class RegisterController {
     }
 
     // Validação de senha
-    if (senha != confirmarSenha) {
+    if (password != confirmarSenha) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("As senhas não coincidem")),
       );
@@ -56,11 +56,11 @@ class RegisterController {
 
     // Criar o usuário
     final user = User(
-      nome: nome,
+      username: username,
       cpf: cpf,
       email: email,
       telefone: telefone,
-      senha: senha,
+      password: password,
       tipo: "Paciente",
     );
 

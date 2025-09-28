@@ -49,7 +49,7 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 30),
 
               // Campos de input
-              _buildTextField("Nome completo", Icons.person, _nomeController),
+              _buildTextField("Nome Completo", Icons.person, _nomeController),
               const SizedBox(height: 15),
 
               _buildTextField("CPF", Icons.credit_card, _cpfController,
@@ -70,7 +70,7 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 15),
 
               _buildPasswordField(
-                  "Confirmar senha",
+                  "Confirmar Senha",
                   _confirmarSenhaController,
                   _confirmarSenhaVisivel,
                   () => setState(
@@ -81,11 +81,11 @@ class _RegisterPageState extends State<RegisterPage> {
               _buildButton("Cadastrar-se", const Color(0xFF42A01C), () {
                 _registerController.register(
                   context,
-                  nome: _nomeController.text,
+                  username: _nomeController.text,
                   cpf: _cpfController.text,
                   email: _emailController.text,
                   telefone: _telefoneController.text,
-                  senha: _senhaController.text,
+                  password: _senhaController.text,
                   confirmarSenha: _confirmarSenhaController.text,
                 );
               }),

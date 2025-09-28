@@ -1,27 +1,27 @@
 class User {
-  final String nome;
+  final String username;
   final String cpf;
   final String email;
   final String telefone;
-  final String senha;
+  final String password;
   final String? tipo; // paciente, medico, secretaria, adm (opcional no cadastro inicial)
 
   User({
-    required this.nome,
+    required this.username,
     required this.cpf,
     required this.email,
     required this.telefone,
-    required this.senha,
+    required this.password,
     this.tipo,
   });
 
   Map<String, dynamic> toJson() {
     return {
-      "nome": nome,
+      "username": username,
       "cpf": cpf,
       "email": email,
       "telefone": telefone,
-      "senha": senha,
+      "password": password,
       "tipo": tipo ?? "Paciente", // por padrão, no app mobile será paciente
     };
   }
