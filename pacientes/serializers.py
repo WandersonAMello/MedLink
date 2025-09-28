@@ -4,14 +4,14 @@ from .models import Paciente
 
 class PacienteSerializer(serializers.ModelSerializer):
     # Campo personalizado para receber o nome completo e dividir
-    nome_completo = serializers.CharField(write_only=True, required=True)
+    username = serializers.CharField(write_only=True, required=True)
     password = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = Paciente
         fields = [
             'id', 'email', 'password',
-            'nome_completo',
+            'username',
             'first_name', 'last_name',
             'cpf', 'telefone', 'data_cadastro'
         ]
@@ -21,18 +21,28 @@ class PacienteSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        nome_completo = validated_data.pop('nome_completo')
+        # Extrai os campos necessários para o método create_user e para a lógica
+        username = validated_data.pop('username')
         password = validated_data.pop('password')
-        
-        nome_parts = nome_completo.split(' ', 1)
+        email = validated_data.pop('email')
+        cpf = validated_data.pop('cpf')
+
+        # Divide o username em nome e sobrenome
+        nome_parts = username.split(' ', 1)
         first_name = nome_parts[0]
         last_name = nome_parts[1] if len(nome_parts) > 1 else ''
 
+        # Adiciona os campos derivados ao restante dos dados validados (que agora contém 'telefone')
+        validated_data['first_name'] = first_name
+        validated_data['last_name'] = last_name
+        validated_data['user_type'] = 'PACIENTE'
+
+        # Chama o create_user do manager com os argumentos posicionais corretos (cpf, email, password)
+        # e o resto dos dados (first_name, last_name, telefone, user_type) no **extra_fields
         paciente = Paciente.objects.create_user(
-            first_name=first_name,
-            last_name=last_name,
+            cpf=cpf,
+            email=email,
             password=password,
-            user_type='PACIENTE', # Tipo padrão para pacientes
             **validated_data
         )
         return paciente

@@ -13,7 +13,7 @@ class Paciente(User):
 
     def nome_completo(self):
         return f"{self.first_name} {self.last_name}"
-    nome_completo.short_description = 'Nome Completo'
+    nome_completo.short_description = 'username'
 
     class Meta:
         verbose_name = 'Paciente'

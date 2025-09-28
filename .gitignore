@@ -14,5 +14,3 @@ venv/
 db.sqlite3
 
 .env
-
-requirements.txt
