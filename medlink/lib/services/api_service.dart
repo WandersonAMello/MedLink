@@ -22,7 +22,7 @@ class ApiService {
 
   Future<bool> register(User user) async {
     final response = await http.post(
-      Uri.parse("$baseUrl/api/register/"),
+      Uri.parse("$baseUrl/api/pacientes/register/"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode(user.toJson()),
     );
