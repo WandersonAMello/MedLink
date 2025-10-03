@@ -8,8 +8,8 @@ from django.db import transaction
 # Modelos do projeto
 from users.models import User
 from pacientes.models import Paciente
-# from medicos.models import Medico # Futuramente, importar o modelo de Medico
-# from secretarias.models import Secretaria # Futuramente, importar o modelo de Secretaria
+from medicos.models import Medico
+from secretarias.models import Secretaria
 from .models import LogEntry
 
 # Serializers do app
@@ -19,15 +19,12 @@ from .serializers import (
     LogEntrySerializer
 )
 
-# Permissões
-from users.permissions import IsAdmin # Assumindo que esta permissão existe em users/permissions.py
-
-
 class AdminUserViewSet(viewsets.ModelViewSet):
     """
     Endpoint da API para administradores gerirem todos os utilizadores do sistema.
     """
     queryset = User.objects.all().order_by('first_name')
+    # CORREÇÃO: Usando a permissão padrão do Django REST Framework para administradores.
     permission_classes = [permissions.IsAdminUser]
 
     # Filtros para a UI (busca e dropdown de tipo)
@@ -46,40 +43,45 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         Sobrescreve o método padrão para criar perfis associados
         após a criação do usuário, garantindo a integridade dos dados.
         """
-        # 1. Primeiro, o serializer.save() cria a instância do User.
         user = serializer.save()
 
-        # 2. Em seguida, verifica o user_type para criar o perfil correspondente.
         try:
             with transaction.atomic():
                 if user.user_type == 'PACIENTE':
-                    # Dados específicos do perfil (ex: telefone) são pegos do request.
                     telefone = self.request.data.get('telefone', '')
                     Paciente.objects.create(user=user, telefone=telefone)
                 
-                # Exemplo para futuros perfis:
-                # elif user.user_type == 'MEDICO':
-                #     crm = self.request.data.get('crm', '')
-                #     Medico.objects.create(user=user, crm=crm)
+                elif user.user_type == 'MEDICO':
+                    crm = self.request.data.get('crm')
+                    especialidade = self.request.data.get('especialidade')
+                    clinica_id = self.request.data.get('clinica_id')
+                    
+                    if not crm or not especialidade:
+                        raise serializers.ValidationError({"detail": "CRM e Especialidade são obrigatórios para o perfil de Médico."})
+
+                    Medico.objects.create(
+                        user=user, 
+                        crm=crm, 
+                        especialidade=especialidade, 
+                        clinica_id=clinica_id
+                    )
                 
-                # elif user.user_type == 'SECRETARIA':
-                #     # Exemplo para quando o modelo Secretaria existir
-                #     clinica_id = self.request.data.get('clinica_id')
-                #     Secretaria.objects.create(user=user, clinica_id=clinica_id)
+                elif user.user_type == 'SECRETARIA':
+                    clinica_id = self.request.data.get('clinica_id')
+                    
+                    if not clinica_id:
+                        raise serializers.ValidationError({"detail": "A Clínica é obrigatória para o perfil de Secretária."})
+
+                    Secretaria.objects.create(user=user, clinica_id=clinica_id)
                 
-                # 3. Cria o log de auditoria se tudo correu bem.
                 LogEntry.objects.create(
                     actor=self.request.user,
                     action_type=LogEntry.ActionType.CREATE,
                     details=f"Criou o utilizador '{user.get_full_name()}' (CPF: {user.cpf}, Tipo: {user.get_user_type_display()})."
                 )
         except Exception as e:
-            # Se a criação do perfil falhar, o usuário recém-criado é deletado
-            # para evitar inconsistência no banco de dados.
             user.delete()
-            # Lança um erro claro para a API.
             raise serializers.ValidationError({"detail": f"Falha ao criar perfil associado: {str(e)}"})
-
 
     def perform_update(self, serializer):
         """ Sobrescreve para adicionar log na atualização. """
@@ -93,7 +95,6 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         """ Sobrescreve para adicionar log na remoção. """
         details = f"Removeu o utilizador '{instance.get_full_name()}' (CPF: {instance.cpf})."
-        # A exclusão do User irá remover o perfil associado devido ao on_delete=models.CASCADE
         instance.delete()
         LogEntry.objects.create(
             actor=self.request.user,
@@ -106,6 +107,7 @@ class AdminDashboardStatsAPIView(APIView):
     """
     Endpoint para fornecer as estatísticas agregadas para o painel de administração.
     """
+    # CORREÇÃO: Usando a permissão padrão do Django REST Framework.
     permission_classes = [permissions.IsAdminUser]
 
     def get(self, request, *args, **kwargs):
@@ -134,6 +136,7 @@ class LogEntryViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = LogEntry.objects.all()
     serializer_class = LogEntrySerializer
+    # CORREÇÃO: Usando a permissão padrão do Django REST Framework.
     permission_classes = [permissions.IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['action_type', 'actor']
