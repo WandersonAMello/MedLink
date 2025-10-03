@@ -1,48 +1,63 @@
 # pacientes/serializers.py
 from rest_framework import serializers
 from .models import Paciente
+from users.models import User
+from django.db import transaction
 
 class PacienteSerializer(serializers.ModelSerializer):
-    # Campo personalizado para receber o nome completo e dividir
-    username = serializers.CharField(write_only=True, required=True)
+    # Campos para receber dados que pertencem ao modelo User
+    username = serializers.CharField(write_only=True, required=True, source="user.first_name") # Mapeia para o nome
     password = serializers.CharField(write_only=True, required=True)
+    email = serializers.EmailField(required=True, source="user.email")
+    cpf = serializers.CharField(required=True, source="user.cpf")
 
     class Meta:
         model = Paciente
+        # 'user' não precisa estar nos fields se for a PK e for gerenciado internamente
         fields = [
-            'id', 'email', 'password',
-            'username',
-            'first_name', 'last_name',
-            'cpf', 'telefone', 'data_cadastro'
+            'email', 'password', 'username', 'cpf',
+            'telefone', 'data_cadastro'
         ]
-        extra_kwargs = {
-            'first_name': {'write_only': True, 'required': False},
-            'last_name': {'write_only': True, 'required': False},
-        }
+        read_only_fields = ['data_cadastro']
 
+    # O método transaction.atomic garante que ou os dois objetos (User e Paciente)
+    # são criados, ou nenhum deles é, mantendo a integridade do banco.
+    @transaction.atomic
     def create(self, validated_data):
-        # Extrai os campos necessários para o método create_user e para a lógica
-        username = validated_data.pop('username')
+        # 1. Extrai os dados do usuário do dicionário validado
+        user_data = validated_data.pop('user')
         password = validated_data.pop('password')
-        email = validated_data.pop('email')
-        cpf = validated_data.pop('cpf')
+        
+        # O username vem como 'first_name' devido ao 'source' no serializer
+        full_name = user_data.pop('first_name')
+        
+        # Divide o nome completo em nome e sobrenome
+        name_parts = full_name.split(' ', 1)
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else ''
 
-        # Divide o username em nome e sobrenome
-        nome_parts = username.split(' ', 1)
-        first_name = nome_parts[0]
-        last_name = nome_parts[1] if len(nome_parts) > 1 else ''
-
-        # Adiciona os campos derivados ao restante dos dados validados (que agora contém 'telefone')
-        validated_data['first_name'] = first_name
-        validated_data['last_name'] = last_name
-        validated_data['user_type'] = 'PACIENTE'
-
-        # Chama o create_user do manager com os argumentos posicionais corretos (cpf, email, password)
-        # e o resto dos dados (first_name, last_name, telefone, user_type) no **extra_fields
-        paciente = Paciente.objects.create_user(
-            cpf=cpf,
-            email=email,
+        # 2. Cria a instância do User
+        user = User.objects.create_user(
+            cpf=user_data['cpf'],
+            email=user_data['email'],
             password=password,
-            **validated_data
+            first_name=first_name,
+            last_name=last_name,
+            user_type='PACIENTE' # Define o tipo de usuário
         )
+
+        # 3. Cria a instância do Paciente, ligando-a ao User recém-criado
+        # validated_data agora contém apenas o campo 'telefone'
+        paciente = Paciente.objects.create(user=user, **validated_data)
+        
         return paciente
+
+    def to_representation(self, instance):
+        """Modifica a representação de saída para incluir dados do User."""
+        representation = super().to_representation(instance)
+        user = instance.user
+        representation['id'] = user.id
+        representation['email'] = user.email
+        representation['cpf'] = user.cpf
+        representation['nome_completo'] = user.get_full_name()
+        return representation
