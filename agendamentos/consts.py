@@ -13,7 +13,8 @@ STATUS_CONSULTA_CHOICES = (
     (STATUS_CONSULTA_CONFIRMADA, _('Confirmada')),
     (STATUS_CONSULTA_CANCELADA, _('Cancelada')),
     (STATUS_CONSULTA_CONCLUIDA, _('Concluída')),
-    (STATUS_CONSULTA_REAGENDAMENTO_SOLICITADO, 'Reagendamento Solicitado'),
+    ('SOLICITANDO_REAGENDAMENTO', 'Solicitando Reagendamento'),
+    ('REAGENDADA', 'Reagendada'),
 )
 
 # Opções simplificadas para o status do pagamento

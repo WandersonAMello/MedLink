@@ -27,3 +27,22 @@ class IsMedicoUser(BasePermission):
         # A verificação 'request.user.is_authenticated' já está incluída na framework
         # quando usamos IsAuthenticated, mas é uma boa prática ser explícito.
         return request.user and request.user.is_authenticated and request.user.user_type == 'MEDICO'
+    
+class HasRole(BasePermission):
+    """
+    Permissão customizada que verifica o campo 'user_type' do usuário.
+    """
+    def has_permission(self, request, view):
+        # Pega a lista de papéis necessários definida na view (ex: ['SECRETARIA'])
+        required_roles = getattr(view, 'required_roles', [])
+
+        # Nega o acesso se a view não definir nenhum papel
+        if not required_roles:
+            return False
+
+        # Pega o usuário da requisição
+        user = request.user
+
+        # Verifica se o usuário está autenticado e se o seu 'user_type'
+        # está na lista de papéis permitidos para esta view.
+        return user and user.is_authenticated and user.user_type in required_roles

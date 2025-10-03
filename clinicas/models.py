@@ -53,7 +53,7 @@ class Clinica(models.Model):
     logradouro = models.CharField(max_length=255, null=True, blank=True)
     numero = models.CharField(max_length=20, null=True, blank=True, verbose_name=_("Número"))
     bairro = models.CharField(max_length=100, null=True, blank=True)
-    cep = models.CharField(max_length=8, null=True, blank=True)
+    cep = models.CharField(max_length=9, null=True, blank=True)
     telefone = models.CharField(max_length=20, null=True, blank=True)
     
     cidade = models.ForeignKey(Cidade, on_delete=models.RESTRICT, verbose_name=_("Cidade"))
