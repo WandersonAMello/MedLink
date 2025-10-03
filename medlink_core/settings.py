@@ -36,6 +36,7 @@ ALLOWED_HOSTS = ["127.0.0.1", "10.0.2.2", "localhost"]
 INSTALLED_APPS = [
     'users',
     'pacientes',
+    'secretarias',
     'medicos',
     'agendamentos',
     'clinicas',

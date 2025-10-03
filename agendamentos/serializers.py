@@ -31,9 +31,10 @@ class ConsultaSerializer(serializers.ModelSerializer):
     def get_paciente_detalhes(self, obj):
         return {
             'id': obj.paciente.id,
-            'nome_completo': obj.paciente.nome_completo,
+            'nome_completo': obj.paciente.nome_completo(), # CORRIGIDO AQUI
             'cpf': obj.paciente.cpf,
         }
+
 
     def get_medico_detalhes(self, obj):
         try:

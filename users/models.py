@@ -1,5 +1,6 @@
 # users/models.py
-from django.contrib.auth.models import AbstractUser, BaseUserManager
+
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -13,7 +14,7 @@ class CustomUserManager(BaseUserManager):
             raise ValueError(_('O CPF deve ser fornecido'))
         if not email:
             raise ValueError(_('O Email deve ser fornecido'))
-        
+
         email = self.normalize_email(email)
         user = self.model(cpf=cpf, email=email, **extra_fields)
         user.set_password(password)
@@ -32,10 +33,8 @@ class CustomUserManager(BaseUserManager):
             raise ValueError(_('Superuser must have is_superuser=True.'))
         return self.create_user(cpf, email, password, **extra_fields)
 
-class User(AbstractUser):
-    # Remove o campo username do modelo padrão
-    username = None
 
+class User(AbstractBaseUser, PermissionsMixin):
     # Enumeração para os tipos de usuário (nossos papéis)
     class UserType(models.TextChoices):
         ADMIN = 'ADMIN', 'Admin'
@@ -46,7 +45,14 @@ class User(AbstractUser):
     # Campos do nosso modelo
     cpf = models.CharField(_('CPF'), max_length=11, unique=True)
     email = models.EmailField(_('endereço de email'), unique=True)
+    first_name = models.CharField(_('primeiro nome'), max_length=150, blank=True)
+    last_name = models.CharField(_('último nome'), max_length=150, blank=True)
     user_type = models.CharField(max_length=20, choices=UserType.choices)
+
+    # Campos de controle do Django
+    is_staff = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    date_joined = models.DateTimeField(auto_now_add=True)
 
     # Configurações do modelo
     USERNAME_FIELD = 'cpf'
@@ -56,3 +62,6 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.get_full_name() or self.cpf
+
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()

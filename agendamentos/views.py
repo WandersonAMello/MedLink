@@ -1,3 +1,5 @@
+#agendamentos/views.py (VERSÃO CORRIGIDA)
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -48,7 +50,6 @@ class ConsultaAPIView(APIView):
     def post(self, request):
         serializer = ConsultaSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
-            # Implementação da validação de conflito de horário (Regra de Negócio 1)
             data_hora = serializer.validated_data['data_hora']
             medico = serializer.validated_data['medico']
             
@@ -59,33 +60,75 @@ class ConsultaAPIView(APIView):
                 )
             
             try:
-                # Transação atômica para garantir a integridade dos dados (Regra de Negócio 2)
                 with transaction.atomic():
-                    # Salva a nova consulta
                     consulta = serializer.save()
-                    
-                    # Cria um registro de pagamento com status inicial PENDENTE
                     Pagamento.objects.create(
                         consulta=consulta,
                         status='PENDENTE',
-                        valor_pago=consulta.valor, # O valor do pagamento é o mesmo da consulta
+                        valor_pago=consulta.valor,
                     )
-
-                    # Cria um registro de log para a criação da consulta (Regra de Negócio 3)
                     ConsultaStatusLog.objects.create(
                         consulta=consulta,
                         status_novo=consulta.status_atual,
                         pessoa=self.request.user
                     )
-
             except Exception as e:
                 return Response(
                     {"error": str(e)},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
-            headers = self.get_success_headers(serializer.data)
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # MÉTODO 'PUT' ADICIONADO NO LUGAR CORRETO
+    def put(self, request, pk=None):
+        if pk is None:
+            return Response(
+                {"error": "A chave primária (pk) é necessária para esta operação."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        consulta = get_object_or_404(self.get_queryset(), pk=pk)
+        # partial=True permite atualizações parciais (só data, só status, ou ambos)
+        serializer = ConsultaSerializer(consulta, data=request.data, partial=True)
+
+        if serializer.is_valid(raise_exception=True):
+            data_hora_nova = serializer.validated_data.get('data_hora', consulta.data_hora)
+            medico = consulta.medico
+
+            # Validação de conflito de horário, excluindo a própria consulta
+            if 'data_hora' in serializer.validated_data:
+                conflitos = Consulta.objects.filter(
+                    medico=medico,
+                    data_hora=data_hora_nova
+                ).exclude(pk=pk)
+
+                if conflitos.exists():
+                    return Response(
+                        {"error": "Médico já tem outra consulta agendada para este novo horário."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            try:
+                with transaction.atomic():
+                    status_anterior = consulta.status_atual
+                    consulta_atualizada = serializer.save()
+
+                    # Se o status foi alterado, cria um log
+                    if consulta_atualizada.status_atual != status_anterior:
+                        ConsultaStatusLog.objects.create(
+                            consulta=consulta_atualizada,
+                            status_novo=consulta_atualizada.status_atual,
+                            pessoa=self.request.user
+                        )
+            except Exception as e:
+                 return Response(
+                    {"error": str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk=None):
@@ -94,12 +137,9 @@ class ConsultaAPIView(APIView):
                 {"error": "A chave primária (pk) é necessária para esta operação."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         consulta = get_object_or_404(self.get_queryset(), pk=pk)
-        
         try:
             with transaction.atomic():
-                # Antes de deletar, registramos o log de cancelamento
                 ConsultaStatusLog.objects.create(
                     consulta=consulta,
                     status_novo='CANCELADA',
@@ -111,16 +151,15 @@ class ConsultaAPIView(APIView):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 # -----------------------------------------------------------------------------
-# Views para a atualização de status e pagamento (delegando a lógica)
+# Views para a atualização de status e pagamento (lógica original)
 # -----------------------------------------------------------------------------
 
 class ConsultaStatusUpdateView(APIView):
     """
-    API para atualizar o status de uma consulta.
+    API para atualizar APENAS o status de uma consulta.
     """
     permission_classes = [IsMedicoOrSecretaria]
 
@@ -128,7 +167,8 @@ class ConsultaStatusUpdateView(APIView):
         consulta = get_object_or_404(Consulta.objects.all(), pk=pk)
         novo_status = request.data.get('status_atual')
 
-        if not novo_status or novo_status not in [choice[0] for choice in consulta.STATUS_CHOICES]:
+        # Corrigido: Acessando choices do modelo, não da instância
+        if not novo_status or novo_status not in [choice[0] for choice in Consulta.STATUS_CONSULTA_CHOICES]:
             return Response(
                 {"error": "O campo 'status_atual' com um valor válido é obrigatório."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -137,10 +177,10 @@ class ConsultaStatusUpdateView(APIView):
         try:
             with transaction.atomic():
                 status_anterior = consulta.status_atual
-                consulta.status_atual = novo_status
-                consulta.save()
+                if consulta.status_atual != novo_status:
+                    consulta.status_atual = novo_status
+                    consulta.save()
 
-                if consulta.status_atual != status_anterior:
                     ConsultaStatusLog.objects.create(
                         consulta=consulta,
                         status_novo=consulta.status_atual,
@@ -152,6 +192,7 @@ class ConsultaStatusUpdateView(APIView):
 
         serializer = ConsultaSerializer(consulta)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class PagamentoUpdateView(APIView):
     """
@@ -170,24 +211,17 @@ class PagamentoUpdateView(APIView):
             )
         
         try:
+            # A transação agora só atualiza o pagamento
             with transaction.atomic():
                 pagamento.status = 'PAGO'
                 pagamento.data_pagamento = timezone.now()
                 pagamento.save()
 
-                # Opcional: Atualizar o status da consulta para 'CONCLUIDA' automaticamente
-                if consulta.status_atual != 'CONCLUIDA':
-                    consulta.status_atual = 'CONCLUIDA'
-                    consulta.save()
-
-                    ConsultaStatusLog.objects.create(
-                        consulta=consulta,
-                        status_novo=consulta.status_atual,
-                        pessoa=self.request.user
-                    )
+                # A LÓGICA QUE ATUALIZAVA A CONSULTA FOI REMOVIDA DAQUI
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        # Retornamos os dados da consulta para que o front-end possa ver a mudança
         serializer = ConsultaSerializer(consulta)
         return Response(serializer.data, status=status.HTTP_200_OK)
