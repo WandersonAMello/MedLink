@@ -16,14 +16,15 @@ class LogEntry(models.Model):
 
     # Quem realizou a ação. Pode ser nulo se a ação for do sistema.
     actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        verbose_name=_("Ator")
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name=_("Ator"),
+        related_name='admin_logs'
     )
     action_type = models.CharField(
-        max_length=20, 
-        choices=ActionType.choices, 
+        max_length=20,
+        choices=ActionType.choices,
         verbose_name=_("Tipo de Ação")
     )
     # Detalhes da ação em formato de texto.
