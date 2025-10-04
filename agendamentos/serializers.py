@@ -29,11 +29,13 @@ class ConsultaSerializer(serializers.ModelSerializer):
     
     # Métodos para obter e serializar os detalhes dos objetos relacionados.
     def get_paciente_detalhes(self, obj):
-        return {
-            'id': obj.paciente.id,
-            'nome_completo': obj.paciente.nome_completo(), # CORRIGIDO AQUI
-            'cpf': obj.paciente.cpf,
-        }
+        if obj.paciente and hasattr(obj.paciente, 'user'):
+            # Usa o método nome_completo do modelo Paciente
+            return {
+                'id': obj.paciente.user.id,
+                'nome_completo': obj.paciente.nome_completo(), # CORRIGIDO AQUI
+                'cpf': obj.paciente.cpf,
+            }
 
 
     def get_medico_detalhes(self, obj):
