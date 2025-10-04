@@ -34,22 +34,27 @@ ALLOWED_HOSTS = ["127.0.0.1", "10.0.2.2", "localhost"]
 
 
 INSTALLED_APPS = [
-    'users',
-    'pacientes',
-    'secretarias',
-    'medicos',
-    'agendamentos',
-    'clinicas',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # Apps de terceiros
     'rest_framework',
     'rest_framework_simplejwt',
     'django_rest_passwordreset',
     'corsheaders',
+
+    # Meus Apps
+    'users',
+    'pacientes',
+    'medicos',
+    'secretarias',
+    'agendamentos',
+    'clinicas',
+    'administrador',
 ]
 
 MIDDLEWARE = [

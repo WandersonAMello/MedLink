@@ -3,6 +3,7 @@ from .models import Consulta, Pagamento
 from users.models import User
 from pacientes.models import Paciente
 from clinicas.models import Clinica
+from medicos.models import Medico # <-- Importação do modelo Medico
 
 class PagamentoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -29,24 +30,39 @@ class ConsultaSerializer(serializers.ModelSerializer):
     
     # Métodos para obter e serializar os detalhes dos objetos relacionados.
     def get_paciente_detalhes(self, obj):
-        return {
-            'id': obj.paciente.id,
-            'nome_completo': obj.paciente.nome_completo(), # CORRIGIDO AQUI
-            'cpf': obj.paciente.cpf,
-        }
+        if obj.paciente and hasattr(obj.paciente, 'user'):
+            return {
+                'id': obj.paciente.user.id,
+                'nome_completo': obj.paciente.nome_completo,
+                'cpf': obj.paciente.user.cpf,
+            }
+        return None
 
 
     def get_medico_detalhes(self, obj):
-        try:
-            medico_user = User.objects.get(id=obj.medico.id, user_type='MEDICO')
-            # Aqui você pode adicionar mais detalhes do perfil do médico se o modelo Medico for implementado
-            return {
-                'id': medico_user.id,
-                'nome_completo': medico_user.get_full_name(),
-                'email': medico_user.email,
-            }
-        except User.DoesNotExist:
-            return None
+        # O 'obj.medico' é a instância do User associado à consulta.
+        if obj.medico:
+            try:
+                # Acessamos o perfil de médico através do related_name 'perfil_medico'
+                perfil_medico = obj.medico.perfil_medico
+                return {
+                    'id': obj.medico.id,
+                    'nome_completo': obj.medico.get_full_name(),
+                    'email': obj.medico.email,
+                    # Adicionando os dados específicos do modelo Medico
+                    'crm': perfil_medico.crm,
+                    'especialidade': perfil_medico.get_especialidade_display(),
+                }
+            except Medico.DoesNotExist:
+                # Caso um User seja do tipo MÉDICO mas não tenha um perfil associado.
+                return {
+                    'id': obj.medico.id,
+                    'nome_completo': obj.medico.get_full_name(),
+                    'email': obj.medico.email,
+                    'crm': None,
+                    'especialidade': None,
+                }
+        return None
 
     def get_clinica_detalhes(self, obj):
         try:
@@ -58,3 +74,4 @@ class ConsultaSerializer(serializers.ModelSerializer):
             }
         except Clinica.DoesNotExist:
             return None
+
