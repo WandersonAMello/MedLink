@@ -1,23 +1,25 @@
 // lib/services/api_service.dart
 
 import 'dart:convert';
-import 'package:flutter/foundation.dart'; // 1. IMPORTE A BIBLIOTECA
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
+import '../models/appointment_model.dart';
+import '../models/dashboard_stats_model.dart';
 
 class ApiService {
-  // 2. USE A LÓGICA PARA DEFINIR A URL AUTOMATICAMENTE
-  final String baseUrl = kIsWeb ? "http://127.0.0.1:8000" : "http://10.0.2.2:8000";
+  final String baseUrl = kIsWeb
+      ? "http://127.0.0.1:8000/api"
+      : "http://10.0.2.2:8000/api";
 
   Future<http.Response> login(String cpf, String password) async {
-    final url = Uri.parse("$baseUrl/api/token/");
+    final url = Uri.parse(
+      "${kIsWeb ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000'}/api/token/",
+    );
     return await http.post(
       url,
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "cpf": cpf,
-        "password": password,
-      }),
+      body: jsonEncode({"cpf": cpf, "password": password}),
     );
   }
 
@@ -33,5 +35,104 @@ class ApiService {
     } else {
       return false;
     }
+  }
+
+  Future<DashboardStats> getDashboardStats(String accessToken) async {
+    final url = Uri.parse("$baseUrl/secretarias/dashboard/stats/");
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      // Se a resposta estiver vazia, retorna um objeto de Stats zerado
+      if (response.body.isEmpty || response.body == "{}") {
+        return DashboardStats(
+          today: 0,
+          confirmed: 0,
+          pending: 0,
+          totalMonth: 0,
+        );
+      }
+      return DashboardStats.fromJson(
+        json.decode(utf8.decode(response.bodyBytes)),
+      );
+    } else {
+      throw Exception('Falha ao carregar estatísticas do dashboard.');
+    }
+  }
+
+  Future<List<Appointment>> getAppointments(String accessToken) async {
+    final url = Uri.parse("$baseUrl/secretarias/dashboard/consultas-hoje/");
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+
+    if (response.statusCode == 200) {
+      // Se a resposta estiver vazia, retorna uma lista vazia em vez de dar erro
+      if (response.body == "[]" || response.body.isEmpty) {
+        return [];
+      }
+      final List<dynamic> jsonList = json.decode(
+        utf8.decode(response.bodyBytes),
+      );
+      return jsonList.map((json) => Appointment.fromJson(json)).toList();
+    } else {
+      throw Exception(
+        'Falha ao carregar agendamentos (Status: ${response.statusCode})',
+      );
+    }
+  }
+
+  Future<http.Response> createAppointment(
+    Appointment appointment,
+    String accessToken,
+  ) async {
+    final url = Uri.parse("$baseUrl/agendamentos/");
+    return await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode(
+        appointment.toJson(),
+      ), // Usa o método toJson do novo modelo
+    );
+  }
+
+  /// Envia uma requisição para confirmar uma consulta específica.
+  /// O backend espera o status atualizado no corpo da requisição.
+  Future<http.Response> confirmAppointment(
+    int appointmentId,
+    String accessToken,
+  ) async {
+    final url = Uri.parse("$baseUrl/consultas/$appointmentId/confirmar/");
+    return await http.patch(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({'status_atual': 'confirmada'}),
+    );
+  }
+
+  /// Envia uma requisição para confirmar uma consulta específica.
+  /// O backend espera o status atualizado no corpo da requisição.
+  /// Este método aceita um objeto Appointment em vez de apenas o ID.
+  Future<http.Response> confirmAppointmentByObject(
+    Appointment appointment,
+    String accessToken,
+  ) async {
+    final url = Uri.parse("$baseUrl/consultas/${appointment.id}/confirmar/");
+    return await http.patch(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode(appointment.toJson()),
+    );
   }
 }

@@ -1,12 +1,9 @@
-# secretarias/serializers.py
-
 from rest_framework import serializers
 from agendamentos.models import Consulta
 
 class DashboardStatsSerializer(serializers.Serializer):
     """
     Serializer para as estatísticas dos cards do dashboard.
-    Não é baseado em um model, apenas define os campos que vamos enviar.
     """
     today = serializers.IntegerField()
     confirmed = serializers.IntegerField()
@@ -16,21 +13,17 @@ class DashboardStatsSerializer(serializers.Serializer):
 
 class ConsultaHojeSerializer(serializers.ModelSerializer):
     """
-    Serializer para a lista de "Consultas de Hoje".
-    Ele vai mapear os campos do nosso modelo `Consulta` para os nomes
-    que o front-end espera (`time`, `patient`, `doctor`, etc.).
+    Serializer para a lista de "Consultas de Hoje", agora com os caminhos corretos.
     """
-    # Aqui renomeamos e formatamos os campos para bater com o front-end
-    time = serializers.TimeField(source='data_hora.time', format='%H:%M')
-    patient = serializers.CharField(source='paciente_pessoa.nome_completo')
-    doctor = serializers.CharField(source='medico_pessoa.pessoa.nome_completo')
-
-    # O front-end espera um campo 'type'. Usaremos o status_atual para isso por enquanto.
-    # Você pode adaptar para outro campo se tiver, como 'tipo_consulta'.
-    type = serializers.CharField(source='get_status_atual_display')
-
-    # O front-end espera o status em minúsculo (e.g., 'confirmed').
-    # O SerializerMethodField nos dá flexibilidade para formatar.
+    # Renomeia e formata os campos para o frontend
+    time = serializers.SerializerMethodField()
+    
+    # 👇 CORREÇÃO APLICADA AQUI 👇
+    # Usa o caminho correto para buscar o nome do paciente e do médico
+    patient = serializers.CharField(source='paciente.nome_completo', read_only=True)
+    doctor = serializers.CharField(source='medico.get_full_name', read_only=True)
+    
+    type = serializers.CharField(source='get_status_atual_display', read_only=True)
     status = serializers.SerializerMethodField()
 
     class Meta:
@@ -38,10 +31,14 @@ class ConsultaHojeSerializer(serializers.ModelSerializer):
         # Lista de campos que o JSON final terá
         fields = ['id', 'time', 'patient', 'doctor', 'type', 'status']
 
+    def get_time(self, obj):
+        # Função para formatar a hora corretamente
+        if obj.data_hora:
+            return obj.data_hora.strftime('%H:%M')
+        return None
+
     def get_status(self, obj):
-        # O front-end usa 'pending', 'confirmed', 'cancelled'.
-        # Nosso banco usa 'AGENDADA', 'CONFIRMADA', 'CANCELADA'.
-        # Esta função faz a tradução.
+        # Sua lógica de tradução de status, que já está correta
         if obj.status_atual == 'AGENDADA':
             return 'pending'
         elif obj.status_atual == 'CONFIRMADA':

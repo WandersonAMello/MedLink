@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:convert'; // Import para o jsonDecode
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // Import do Secure Storage
 import '../../controllers/login_controller.dart';
-//import 'dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,9 +15,14 @@ class _LoginPageState extends State<LoginPage> {
   final _senhaController = TextEditingController();
   final LoginController _loginController = LoginController();
 
+  // 1. Variável para controlar o estado de carregamento
+  bool _isLoading = false;
+
+  // 2. LÓGICA DE LOGIN ATUALIZADA
   void _onLoginPressed() async {
     final cpf = _cpfController.text;
     final senha = _senhaController.text;
+    print("Tentando login com CPF: $cpf e Senha: $senha");
 
     if (!_loginController.validarCPF(cpf)) {
       if (!mounted) return;
@@ -26,29 +32,61 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    final sucesso = await _loginController.login(cpf, senha);
+    // Ativa o loading na UI
+    setState(() => _isLoading = true);
 
-    if (!mounted) return; // 👈 garante que o widget ainda existe
+    // Chama o controller, que agora retorna um mapa com os dados ou nulo
+    final loginData = await _loginController.login(cpf, senha);
 
-    if (sucesso) {
+    // Desativa o loading na UI
+    setState(() => _isLoading = false);
+
+    if (!mounted) return;
+
+    if (loginData != null) {
+      // Sucesso! Pega os dados do mapa
+      final accessToken = loginData['access_token'];
+      final userType = loginData['user_type'];
+
+      // Salva o token de forma segura
+      const storage = FlutterSecureStorage();
+      await storage.write(key: 'access_token', value: accessToken);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Login realizado com sucesso!")),
       );
-      // Navegação segura
-      Navigator.pushReplacementNamed(context, "/home");
+
+      // 3. LÓGICA DE REDIRECIONAMENTO
+      switch (userType) {
+        case 'SECRETARIA':
+          Navigator.pushReplacementNamed(context, '/secretary/dashboard');
+          break;
+        case 'MEDICO':
+          Navigator.pushReplacementNamed(context, '/doctor/dashboard');
+          break;
+        case 'ADMIN':
+          Navigator.pushReplacementNamed(context, '/admin/dashboard');
+          break;
+        // Adicione outros casos aqui (ex: 'PACIENTE', 'FINANCEIRO')
+        default:
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Tipo de usuário desconhecido!")),
+          );
+      }
     } else {
+      // Falha no login (senha errada, usuário não existe ou erro de conexão)
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Usuário ou senha incorretos")),
       );
     }
   }
 
-  bool _obscurePassword = true; // controla o olho da senha
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF5BBCDC), // 👈 cor de fundo
+      backgroundColor: const Color(0xFF5BBCDC),
       body: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
@@ -95,27 +133,25 @@ class _LoginPageState extends State<LoginPage> {
                       controller: _cpfController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.badge),
+                        prefixIcon: const Icon(Icons.badge),
                         hintText: "000.000.000-00",
                         border: OutlineInputBorder(
                           borderSide: const BorderSide(
                             color: Color(0xFF5BBCDC),
-                          ), // cor padrão
-                          borderRadius: BorderRadius.circular(
-                            8,
-                          ), // opcional: arredondar borda
+                          ),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderSide: const BorderSide(
                             color: Color(0xFF5BBCDC),
                             width: 2,
-                          ), // quando selecionado
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderSide: const BorderSide(
                             color: Color(0xFF5BBCDC),
-                          ), // quando não selecionado
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
@@ -173,21 +209,19 @@ class _LoginPageState extends State<LoginPage> {
                         child: const Text("Esqueci minha senha"),
                       ),
                     ),
-
                     const SizedBox(height: 8),
 
                     // Botão Entrar
                     ElevatedButton(
-                      onPressed: _onLoginPressed,
+                      onPressed: _isLoading
+                          ? null
+                          : _onLoginPressed, // Desabilita durante o loading
                       style: ButtonStyle(
                         backgroundColor:
-                            WidgetStateProperty.resolveWith<Color?>((
-                              Set<WidgetState> states,
-                            ) {
-                              if (states.contains(WidgetState.hovered)) {
-                                return const Color(0xFF166580); // hover
-                              }
-                              return const Color(0xFF1D80A1); // normal
+                            WidgetStateProperty.resolveWith<Color?>((states) {
+                              if (states.contains(WidgetState.hovered))
+                                return const Color(0xFF166580);
+                              return const Color(0xFF1D80A1);
                             }),
                         foregroundColor: WidgetStateProperty.all<Color>(
                           Colors.white,
@@ -209,11 +243,17 @@ class _LoginPageState extends State<LoginPage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        mouseCursor: WidgetStateProperty.all<MouseCursor>(
-                          WidgetStateMouseCursor.clickable,
-                        ),
                       ),
-                      child: const Text("Entrar"),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : const Text("Entrar"),
                     ),
 
                     const SizedBox(height: 16),
@@ -227,13 +267,10 @@ class _LoginPageState extends State<LoginPage> {
                       },
                       style: ButtonStyle(
                         backgroundColor:
-                            WidgetStateProperty.resolveWith<Color?>((
-                              Set<WidgetState> states,
-                            ) {
-                              if (states.contains(WidgetState.hovered)) {
-                                return const Color(0xFF317714); // hover
-                              }
-                              return const Color(0xFF42A01C); // normal
+                            WidgetStateProperty.resolveWith<Color?>((states) {
+                              if (states.contains(WidgetState.hovered))
+                                return const Color(0xFF317714);
+                              return const Color(0xFF42A01C);
                             }),
                         foregroundColor: WidgetStateProperty.all<Color>(
                           Colors.white,
@@ -254,9 +291,6 @@ class _LoginPageState extends State<LoginPage> {
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
-                        ),
-                        mouseCursor: WidgetStateProperty.all<MouseCursor>(
-                          WidgetStateMouseCursor.clickable,
                         ),
                       ),
                       child: const Text("Cadastrar-se"),
