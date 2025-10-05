@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'django_rest_passwordreset',
     'corsheaders',
+    'django_filters',
 
     # Meus Apps
     'users',
@@ -55,6 +56,7 @@ INSTALLED_APPS = [
     'agendamentos',
     'clinicas',
     'administrador',
+    'configuracoes',
 ]
 
 MIDDLEWARE = [

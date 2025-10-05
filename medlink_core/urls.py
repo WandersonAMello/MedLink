@@ -35,4 +35,5 @@ urlpatterns = [
     path('api/secretarias/', include('secretarias.urls')),
     path('api/clinicas/', include('clinicas.urls')),
     path('api/admin/', include('administrador.urls')),
+     path("api/admin/", include("configuracoes.urls")),
 ]
