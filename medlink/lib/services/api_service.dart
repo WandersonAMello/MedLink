@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:medlink/views/pages/admin.dart';
 import '../models/user_model.dart';
 import '../models/appointment_model.dart';
 import '../models/dashboard_stats_model.dart';
@@ -133,6 +134,53 @@ class ApiService {
         'Authorization': 'Bearer $accessToken',
       },
       body: jsonEncode(appointment.toJson()),
+    );
+  }
+
+  // --- MÉTODOS DO ADMIN ---
+
+  Future<List<AdminUser>> getClinicUsers(String accessToken) async {
+    // 👇 CORREÇÃO: O caminho agora é relativo à baseUrl
+    final url = Uri.parse("$baseUrl/admin/users/");
+
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> jsonList = json.decode(
+        utf8.decode(response.bodyBytes),
+      );
+      return jsonList.map((json) => AdminUser.fromJson(json)).toList();
+    } else {
+      throw Exception(
+        'Falha ao carregar usuários (Status: ${response.statusCode})',
+      );
+    }
+  }
+
+  Future<http.Response> updateUserStatus(
+    String userId,
+    bool isActive,
+    String accessToken,
+  ) async {
+    final url = Uri.parse("$baseUrl/admin/users/$userId/");
+    return await http.patch(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({'is_active': isActive}),
+    );
+  }
+
+  Future<http.Response> deleteUser(String userId, String accessToken) async {
+    final url = Uri.parse("$baseUrl/admin/users/$userId/");
+    return await http.delete(
+      url,
+      headers: {'Authorization': 'Bearer $accessToken'},
     );
   }
 }

@@ -47,7 +47,7 @@ class MyApp extends StatelessWidget {
 
         // Rotas de Dashboards por Perfil de Usuário
         '/secretary/dashboard': (context) => const SecretaryDashboard(),
-        // '/admin/dashboard': (context) => const AdminDashboardScreen(),
+        '/admin/dashboard': (context) => const AdminDashboard(),
 
         // TODO: Adicione as rotas para os outros perfis aqui quando as telas existirem
         // '/doctor/dashboard': (context) => const DoctorDashboard(),
