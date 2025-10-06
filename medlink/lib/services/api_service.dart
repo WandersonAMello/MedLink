@@ -280,4 +280,21 @@ class ApiService {
       );
     }
   }
+
+  Future<http.Response> createPatient(
+    Map<String, dynamic> patientData,
+    String accessToken,
+  ) async {
+    // A URL correta para o cadastro de pacientes, como definido pela sua equipe
+    final url = Uri.parse("$baseUrl/pacientes/register/");
+
+    return await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode(patientData),
+    );
+  }
 }

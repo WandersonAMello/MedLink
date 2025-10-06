@@ -13,7 +13,10 @@ import 'views/pages/admin_edit_user_page.dart'; // 2. ADICIONE ESTA IMPORTAÇÃO
 // 1. IMPORTE TODAS AS SUAS PÁGINAS PRINCIPAIS
 import 'views/pages/login.dart';
 import 'views/pages/register.dart';
-import 'views/pages/dashboard_page.dart'; // Tela da Secretária
+import 'views/pages/dashboard_page.dart';
+
+// Tela de Novo Paciente
+// Tela da Secretária
 // import 'views/pages/admin_dashboard_screen.dart'; // Tela do Admin da Clínica
 // TODO: Adicione os imports para as telas do Médico, Paciente, etc. quando criá-las
 // import 'views/pages/doctor_dashboard_page.dart';

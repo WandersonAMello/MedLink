@@ -61,6 +61,9 @@ class PacienteSerializer(serializers.ModelSerializer):
         representation['cpf'] = user.cpf
         representation['nome_completo'] = user.get_full_name()
         return representation
+    
+
+
 from rest_framework import serializers
 from .models import Paciente
 from users.models import User

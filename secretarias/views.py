@@ -10,6 +10,12 @@ from rest_framework.permissions import IsAuthenticated
 # Importando os modelos e serializers necessários
 from agendamentos.models import Consulta, ConsultaStatusLog
 from .serializers import DashboardStatsSerializer, ConsultaHojeSerializer
+from .serializers import DashboardStatsSerializer, ConsultaHojeSerializer
+from users.permissions import HasRole
+
+# 1. IMPORTE AS CONSTANTES DE STATUS DO SEU APP DE AGENDAMENTOS
+from agendamentos.consts import STATUS_CONSULTA_CONFIRMADA, STATUS_CONSULTA_PENDENTE
+
 
 # ATENÇÃO: Verifique se sua classe de permissão está neste local e com este nome.
 # Se for diferente, ajuste o import.
@@ -18,37 +24,31 @@ from users.permissions import HasRole
 class DashboardStatsView(APIView):
     """
     Fornece os dados para os cards de estatísticas do dashboard.
-    Ex: {'today': 5, 'confirmed': 2, 'pending': 3, 'totalMonth': 127}
     """
     permission_classes = [IsAuthenticated, HasRole]
-    required_roles = ['SECRETARIA'] # Apenas usuários com o papel 'SECRETARIA' podem acessar
+    required_roles = ['SECRETARIA']
 
     def get(self, request):
         today = date.today()
         
-        # ATENÇÃO: Esta parte assume que a secretária está ligada a uma clínica.
-        # Se a lógica para encontrar a clínica da secretária for diferente, ajuste aqui.
-        # Exemplo: secretaria = request.user.secretaria_profile
-        # clinica_id = secretaria.clinica_id
-        # Por enquanto, vamos filtrar sem clínica específica para não dar erro.
-        
-        # Filtros de data
+        # O filtro por clínica virá no futuro, por enquanto busca todas do dia
         consultas_do_dia = Consulta.objects.filter(data_hora__date=today)
         consultas_do_mes = Consulta.objects.filter(data_hora__year=today.year, data_hora__month=today.month)
 
         # Contagens
         stats_data = {
             'today': consultas_do_dia.count(),
-            'confirmed': consultas_do_dia.filter(status_atual='CONFIRMADA').count(),
-            'pending': consultas_do_dia.filter(status_atual='AGENDADA').count(),
+            
+            # 👇 CORREÇÃO: USANDO AS CONSTANTES PARA GARANTIR CONSISTÊNCIA 👇
+            'confirmed': consultas_do_dia.filter(status_atual=STATUS_CONSULTA_CONFIRMADA).count(),
+            'pending': consultas_do_dia.filter(status_atual=STATUS_CONSULTA_PENDENTE).count(),
+            
             'totalMonth': consultas_do_mes.count(),
         }
 
-        # Usando o serializer para garantir que os dados estão no formato correto
         serializer = DashboardStatsSerializer(data=stats_data)
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
-
 
 class ConsultasHojeView(ListAPIView):
     """

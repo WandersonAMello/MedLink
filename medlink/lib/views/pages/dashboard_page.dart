@@ -240,7 +240,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
             ),
             const SizedBox(width: 12),
             OutlinedButton.icon(
-              onPressed: widget.onLogout,
+              onPressed: _logout,
               icon: const Icon(Icons.logout, size: 16),
               label: const Text('Sair'),
             ),
@@ -491,7 +491,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
               'Novo Paciente',
               Icons.person_add,
               Colors.grey[700]!,
-              widget.onNavigateToNewPatient ?? () {},
+              _showNewPatientDialog,
             ),
           ],
         ),
@@ -764,5 +764,173 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+  // Em _SecretaryDashboardState
+
+  Future<void> _logout() async {
+    // 1. Apaga todos os tokens salvos no armazenamento seguro.
+    // É uma boa prática limpar tudo para garantir que nenhum dado antigo permaneça.
+    await _storage.deleteAll();
+
+    // 2. Navega para a tela de login ('/') e remove todas as telas anteriores da pilha.
+    // Isso impede que o usuário aperte "voltar" e retorne ao dashboard.
+    if (mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    }
+  }
+  // Em _SecretaryDashboardState
+
+  void _navigateToNewPatient() {
+    // Navega para a nova tela, passando o ID do usuário como argumento
+    Navigator.pushNamed(context, '/new-patient').then((_) {
+      // Esta função será chamada quando você VOLTAR da tela de cadastro.
+      // Recarregamos os dados para garantir que as listas de pacientes e
+      // agendamentos estejam atualizadas.
+      print("Voltando da tela de cadastro de paciente, atualizando dados...");
+      _loadInitialData();
+    });
+  }
+
+  // Em _SecretaryDashboardState
+
+  void _showNewPatientDialog() {
+    final formKey = GlobalKey<FormState>();
+    final nomeController = TextEditingController();
+    final cpfController = TextEditingController();
+    final emailController = TextEditingController();
+    final telefoneController = TextEditingController();
+    // Para pacientes, não precisamos de senha no formulário da secretária
+    // O backend pode gerar uma senha inicial ou um link para definição de senha.
+
+    bool isDialogLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Cadastrar Novo Paciente'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: nomeController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome Completo',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: cpfController,
+                        decoration: const InputDecoration(labelText: 'CPF'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: emailController,
+                        decoration: const InputDecoration(labelText: 'E-mail'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: telefoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Telefone',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          if (!(formKey.currentState?.validate() ?? false))
+                            return;
+
+                          setDialogState(() => isDialogLoading = true);
+
+                          try {
+                            final accessToken = await _storage.read(
+                              key: 'access_token',
+                            );
+                            if (accessToken == null)
+                              throw Exception('Token não encontrado');
+
+                            // Monta o JSON para criar um usuário do tipo PACIENTE
+                            final userData = {
+                              "nome_completo": nomeController.text,
+                              "cpf": cpfController.text,
+                              "email": emailController.text,
+                              "telefone": telefoneController.text,
+                              "user_type": "PACIENTE",
+                              // A API do backend deve ser responsável por gerar uma senha padrão
+                              // ou enviar um link de redefinição de senha para o novo paciente.
+                            };
+
+                            // Reutilizamos o método createClinicUser, pois ele cria qualquer tipo de usuário
+                            // TODO: Talvez renomear para `createUser` no ApiService para ficar mais genérico
+                            final response = await _apiService.createPatient(
+                              userData,
+                              accessToken,
+                            );
+
+                            if (!mounted) return;
+                            if (response.statusCode == 201) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Paciente criado com sucesso!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _loadInitialData(); // Atualiza a lista de pacientes para o dropdown
+                            } else {
+                              final error = jsonDecode(
+                                utf8.decode(response.bodyBytes),
+                              );
+                              throw Exception(
+                                'Falha ao criar paciente: $error',
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted)
+                              setDialogState(() => isDialogLoading = false);
+                          }
+                        },
+                  child: isDialogLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }
