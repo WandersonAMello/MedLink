@@ -169,8 +169,8 @@ class MedicoDashboardPage extends StatelessWidget {
   }
 
   Widget buildDashboardContent(BuildContext context, Paciente pacienteSelecionado) {
-    final historico = pacienteSelecionado.consultasHistoricas;
-    final consultaAtual = historico.isNotEmpty ? historico.first : null;
+    // A variável 'historico' pode ser usada mais tarde para a lista de histórico
+    final historico = pacienteSelecionado.consultasHistoricas; 
 
     final historicoRelatorios = [
       Relatorio(titulo: 'Relatório Exemplo 1', conteudo: 'Conteúdo do relatório 1...'),
@@ -185,6 +185,7 @@ class MedicoDashboardPage extends StatelessWidget {
             flex: 225,
             child: Row(
               children: [
+                // Bloco 1 -> Informações do Paciente (sem alterações)
                 Flexible(
                   flex: 2,
                   child: Container(
@@ -206,8 +207,10 @@ class MedicoDashboardPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 15),
-                Flexible(
-                  flex: 1,
+
+                // --- BLOCO 2 CORRIGIDO (Layout e Dados) ---
+                SizedBox(
+                  width: 300, // 1. CORREÇÃO DE LAYOUT: Tamanho fixo restaurado
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(color: MedicoDashboardPage.primaryBlue, borderRadius: BorderRadius.circular(8)),
@@ -217,16 +220,17 @@ class MedicoDashboardPage extends StatelessWidget {
                       children: [
                         const Text("Informações da Consulta", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                         const SizedBox(height: 12),
-                        // CORREÇÃO: Verifica se 'consultaAtual' não é nulo antes de acessar
-                        Text("Data/Hora: ${consultaAtual != null ? DateFormat('dd/MM/yyyy HH:mm').format(consultaAtual.horario) : 'N/A'}", style: const TextStyle(color: Colors.white70)),
+                        // 2. CORREÇÃO DE DADOS: Usando os campos corretos do paciente
+                        Text("Data/Hora: ${DateFormat('dd/MM/yyyy HH:mm').format(pacienteSelecionado.horario)}", style: const TextStyle(color: Colors.white70)),
                         const SizedBox(height: 6),
-                        Text("Especialidade: ${consultaAtual?.especialidade ?? 'N/A'}", style: const TextStyle(color: Colors.white70)),
+                        Text("Especialidade: ${pacienteSelecionado.especialidade}", style: const TextStyle(color: Colors.white70)),
                         const SizedBox(height: 6),
-                        Text("Profissional: ${consultaAtual?.profissional ?? 'N/A'}", style: const TextStyle(color: Colors.white70)),
+                        Text("Profissional: ${pacienteSelecionado.profissional}", style: const TextStyle(color: Colors.white70)),
                       ],
                     ),
                   ),
                 ),
+
               ],
             ),
           ),
@@ -234,6 +238,7 @@ class MedicoDashboardPage extends StatelessWidget {
           Expanded(
             flex: 300,
             child: Row(
+              // ... (O resto do seu layout para anotações e relatórios continua aqui, sem alterações)
               children: [
                 Flexible(
                   flex: 2,
@@ -308,7 +313,8 @@ class MedicoDashboardPage extends StatelessWidget {
           Expanded(
             flex: 250,
             child: Row(
-              children: [
+              // ... (O restante do layout continua aqui, sem alterações)
+               children: [
                 Flexible(
                   flex: 2,
                   child: Container(

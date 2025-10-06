@@ -1,14 +1,20 @@
 // lib/models/paciente.dart
+
 import 'package:medlink/models/consultas.dart' as consultas_model;
 
 class Paciente {
   final int id;
   final String nome;
-  final DateTime horario; // Horário da consulta de hoje
-  final String status;    // Status da consulta de hoje
+  final DateTime horario;
+  final String status;
   final String telefone;
   final String email;
-  final String cpf; // Adicionado para consistência
+  final String cpf;
+  
+  // --- NOVOS CAMPOS ADICIONADOS ---
+  final String profissional;
+  final String especialidade;
+
   // O histórico completo pode ser carregado depois, ao selecionar o paciente
   final List<consultas_model.Consulta> consultasHistoricas;
 
@@ -20,30 +26,30 @@ class Paciente {
     required this.telefone,
     required this.email,
     required this.cpf,
+    required this.profissional, // Adicionado
+    required this.especialidade, // Adicionado
     required this.consultasHistoricas,
   });
 
-  // FÁBRICA AJUSTADA para o novo formato da API
   factory Paciente.fromJson(Map<String, dynamic> json) {
     return Paciente(
-      // Dados que vêm do PacienteSerializer
       id: json['id'] ?? 0,
-      nome: json['nome_completo'] ?? 'Nome não encontrado', // O serializer envia 'nome_completo'
+      nome: json['nome_completo'] ?? 'Nome não encontrado',
       email: json['email'] ?? 'E-mail não informado',
       telefone: json['telefone'] ?? 'Telefone não informado',
       cpf: json['cpf'] ?? 'CPF não informado',
-
-      // Dados que adicionamos na view
       horario: DateTime.parse(json['horario']),
       status: json['status'] ?? 'N/A',
+
+      // --- NOVOS CAMPOS SENDO LIDOS DO JSON ---
+      profissional: json['profissional'] ?? 'Não informado',
+      especialidade: json['especialidade'] ?? 'Não informada',
       
-      // O histórico não vem na lista inicial, então criamos uma lista vazia.
       consultasHistoricas: [],
     );
   }
 
   Map<String, dynamic> toJson() {
-    // Este método não precisa de alterações
     return {
       'id': id,
       'nome': nome,
@@ -52,6 +58,8 @@ class Paciente {
       'telefone': telefone,
       'email': email,
       'cpf': cpf,
+      'profissional': profissional, // Adicionado
+      'especialidade': especialidade, // Adicionado
       'consultasHistoricas': consultasHistoricas
           .map((c) => c.toJson())
           .toList(),
