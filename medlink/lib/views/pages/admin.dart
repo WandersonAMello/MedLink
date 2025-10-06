@@ -261,24 +261,52 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
+  // Em _AdminDashboardState
+
+  // Em _AdminDashboardState
+
   Future<void> _deleteUser(String userId) async {
     try {
       final accessToken = await _storage.read(key: 'access_token');
       if (accessToken == null) throw Exception('Token não encontrado');
-      await _apiService.deleteUser(userId, accessToken);
-      setState(
-        () => _allUsers.removeWhere((u) => u.id == userId),
-      ); // Remove da lista local
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Usuário removido com sucesso'),
-          backgroundColor: primaryColor,
-        ),
-      );
+
+      final response = await _apiService.deleteUser(userId, accessToken);
+
+      // 204 No Content é a resposta padrão de sucesso para um DELETE
+      if (response.statusCode == 204) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Usuário removido com sucesso'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Atualiza a lista de usuários na tela após a exclusão
+        _loadInitialData();
+      } else {
+        // 👇 A LÓGICA PARA TRATAR O ERRO ACONTECE AQUI 👇
+
+        String errorMessage = "Falha ao remover usuário."; // Mensagem padrão
+
+        // Se o erro for 500, é muito provável que seja a nossa restrição de exclusão.
+        // Então, mostramos a mensagem personalizada.
+        if (response.statusCode == 500) {
+          errorMessage =
+              "Este usuário não pode ser excluído pois possui registros associados (como consultas). Considere inativá-lo.";
+        } else if (response.body.isNotEmpty) {
+          // Tenta pegar uma mensagem mais específica do backend, se houver
+          final errorBody = jsonDecode(response.body);
+          errorMessage = errorBody['detail'] ?? errorMessage;
+        }
+
+        throw Exception(errorMessage);
+      }
     } catch (e) {
+      if (!mounted) return;
+      // Mostra a mensagem de erro (seja a genérica ou a nossa personalizada)
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao remover usuário: $e'),
+          // O .replaceFirst remove o "Exception: " do início da mensagem
+          content: Text(e.toString().replaceFirst("Exception: ", "")),
           backgroundColor: Colors.red,
         ),
       );
@@ -368,7 +396,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             ),
             const SizedBox(width: 12),
             OutlinedButton.icon(
-              onPressed: widget.onLogout,
+              onPressed: _logout,
               icon: const Icon(Icons.logout, size: 16),
               label: const Text('Sair'),
             ),
@@ -582,102 +610,112 @@ class _AdminDashboardState extends State<AdminDashboard>
             ],
           ),
           const SizedBox(height: 16),
+
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columnSpacing: 16,
-                      columns: const [
-                        DataColumn(label: Text('Nome')),
-                        DataColumn(label: Text('CPF')),
-                        DataColumn(label: Text('E-mail')),
-                        DataColumn(label: Text('Tipo')),
-                        DataColumn(label: Text('Status')),
-                        DataColumn(label: Text('Último Login')),
-                        DataColumn(label: Text('Ações')),
-                      ],
-                      rows: _filteredUsers.map((user) {
-                        final roleConfig = _getRoleConfig(user.role);
-                        return DataRow(
-                          cells: [
-                            DataCell(
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    user.name ?? 'Sem nome',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                    // Este widget permite a rolagem VERTICAL
+                    child: SizedBox(
+                      width: double.infinity, // Ocupa toda a largura possível
+                      child: SingleChildScrollView(
+                        // E este permite a rolagem HORIZONTAL
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columnSpacing:
+                              24, // Aumenta o espaçamento entre colunas
+                          columns: const [
+                            DataColumn(label: Text('Nome')),
+                            DataColumn(label: Text('CPF')),
+                            DataColumn(label: Text('E-mail')),
+                            DataColumn(label: Text('Tipo')),
+                            DataColumn(label: Text('Status')),
+                            DataColumn(label: Text('Último Login')),
+                            DataColumn(label: Text('Ações')),
+                          ],
+                          rows: _filteredUsers.map((user) {
+                            final roleConfig = _getRoleConfig(user.role);
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        user.name ?? 'Sem nome',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      if (user.specialty != null)
+                                        Text(
+                                          user.specialty!,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                  if (user.specialty != null)
-                                    Text(
-                                      user.specialty!,
+                                ),
+                                DataCell(Text(user.cpf ?? '')),
+                                DataCell(Text(user.email ?? '')),
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: (roleConfig['color'] as Color)
+                                          .withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      roleConfig['label'],
                                       style: TextStyle(
+                                        color: roleConfig['color'],
                                         fontSize: 12,
-                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
-                                ],
-                              ),
-                            ),
-                            DataCell(Text(user.cpf ?? '')),
-                            DataCell(Text(user.email ?? '')),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: (roleConfig['color'] as Color)
-                                      .withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  roleConfig['label'],
-                                  style: TextStyle(
-                                    color: roleConfig['color'],
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                              ),
-                            ),
-                            DataCell(
-                              Switch(
-                                value: user.isActive,
-                                onChanged: (value) =>
-                                    _toggleUserStatus(user.id),
-                                activeColor: primaryColor,
-                              ),
-                            ),
-                            DataCell(Text(_formatDate(user.lastLogin))),
-                            DataCell(
-                              Row(
-                                children: [
-                                  IconButton(
-                                    onPressed: () {},
-                                    icon: const Icon(Icons.edit, size: 18),
+                                DataCell(
+                                  Switch(
+                                    value: user.isActive,
+                                    onChanged: (value) =>
+                                        _toggleUserStatus(user.id),
+                                    activeColor: primaryColor,
                                   ),
-                                  IconButton(
-                                    onPressed: () =>
-                                        _showDeleteConfirmation(user),
-                                    icon: Icon(
-                                      Icons.delete,
-                                      color: Colors.red[600],
-                                      size: 18,
-                                    ),
+                                ),
+                                DataCell(Text(_formatDate(user.lastLogin))),
+                                DataCell(
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        onPressed: () => _editUser(user.id),
+                                        icon: const Icon(Icons.edit, size: 18),
+                                      ),
+                                      IconButton(
+                                        onPressed: () =>
+                                            _showDeleteConfirmation(user),
+                                        icon: Icon(
+                                          Icons.delete,
+                                          color: Colors.red[600],
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      }).toList(),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
                     ),
                   ),
           ),
@@ -1038,5 +1076,29 @@ class _AdminDashboardState extends State<AdminDashboard>
         );
       },
     );
+  }
+  // Em _AdminDashboardState
+
+  Future<void> _logout() async {
+    // 1. Apaga todos os dados salvos no armazenamento seguro
+    await _storage.deleteAll();
+
+    // 2. Navega para a tela de login e remove todas as telas anteriores da pilha
+    if (mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    }
+  }
+  // Em _AdminDashboardState
+
+  // SUBSTITUA a função _editUser (que você tinha no DataTable) por esta:
+  void _editUser(String userId) {
+    // Navega para a nova tela, passando o ID do usuário como argumento
+    Navigator.pushNamed(context, '/admin/edit-user', arguments: userId).then((
+      _,
+    ) {
+      // Esta função será chamada quando você VOLTAR da tela de edição.
+      // Recarregamos os dados para garantir que a lista esteja atualizada.
+      _loadInitialData();
+    });
   }
 }

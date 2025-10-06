@@ -7,6 +7,7 @@ import 'views/pages/register.dart';
 import 'views/pages/dashboard_page.dart';
 import 'views/pages/admin.dart';
 import 'views/pages/home_page.dart'; // 1. ADICIONE ESTA IMPORTAÇÃO
+import 'views/pages/admin_edit_user_page.dart'; // 2. ADICIONE ESTA IMPORTAÇÃO
 // lib/main.dart
 
 // 1. IMPORTE TODAS AS SUAS PÁGINAS PRINCIPAIS
@@ -48,6 +49,11 @@ class MyApp extends StatelessWidget {
         // Rotas de Dashboards por Perfil de Usuário
         '/secretary/dashboard': (context) => const SecretaryDashboard(),
         '/admin/dashboard': (context) => const AdminDashboard(),
+        '/admin/edit-user': (context) {
+          // Pega o ID do usuário passado como argumento na navegação
+          final userId = ModalRoute.of(context)?.settings.arguments as String;
+          return AdminEditUserPage(userId: userId);
+        },
 
         // TODO: Adicione as rotas para os outros perfis aqui quando as telas existirem
         // '/doctor/dashboard': (context) => const DoctorDashboard(),

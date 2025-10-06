@@ -203,4 +203,38 @@ class ApiService {
       body: jsonEncode(userData),
     );
   }
+  // --- NOVOS MÉTODOS PARA A TELA DE EDIÇÃO ---
+
+  /// Busca os detalhes de um único usuário pelo seu ID.
+  Future<AdminUser> getSingleUser(String userId, String accessToken) async {
+    final url = Uri.parse("$baseUrl/admin/users/$userId/");
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+
+    if (response.statusCode == 200) {
+      // Usa o AdminUser.fromJson que já criamos para "traduzir" a resposta
+      return AdminUser.fromJson(json.decode(utf8.decode(response.bodyBytes)));
+    } else {
+      throw Exception('Falha ao carregar dados do usuário.');
+    }
+  }
+
+  /// Atualiza os dados de um usuário (PATCH para atualização parcial).
+  Future<http.Response> updateUser(
+    String userId,
+    Map<String, dynamic> data,
+    String accessToken,
+  ) async {
+    final url = Uri.parse("$baseUrl/admin/users/$userId/");
+    return await http.patch(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode(data),
+    );
+  }
 }
