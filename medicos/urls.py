@@ -1,12 +1,15 @@
 # medicos/urls.py
 
 from django.urls import path
-from .views import MedicoAgendaAPIView, SolicitarReagendamentoAPIView
+# 1. Importe a View para LISTAR médicos (o nome pode ser diferente)
+from .views import MedicoAgendaAPIView, SolicitarReagendamentoAPIView, MedicoListView
 
 urlpatterns = [
-    # Rota para a US005
+    # Suas rotas existentes
     path('agenda/', MedicoAgendaAPIView.as_view(), name='medico-agenda'),
-
-    # Rota para a US006
     path('consultas/<int:pk>/solicitar-reagendamento/', SolicitarReagendamentoAPIView.as_view(), name='solicitar-reagendamento'),
+    
+    # 👇 ROTA FALTANTE ADICIONADA AQUI 👇
+    # Esta rota responde ao GET em /api/medicos/ e retorna a lista
+    path('', MedicoListView.as_view(), name='medico-list'),
 ]

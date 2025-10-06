@@ -61,3 +61,21 @@ class PacienteSerializer(serializers.ModelSerializer):
         representation['cpf'] = user.cpf
         representation['nome_completo'] = user.get_full_name()
         return representation
+from rest_framework import serializers
+from .models import Paciente
+from users.models import User
+
+# Um serializer auxiliar para os dados do usuário que queremos mostrar
+class UserForPatientSerializer(serializers.ModelSerializer):
+    full_name = serializers.CharField(source='get_full_name')
+
+    class Meta:
+        model = User
+        fields = ['id', 'full_name', 'email', 'cpf']
+
+# Em pacientes/serializers.py
+class PacienteSerializer(serializers.ModelSerializer):
+    user = UserForPatientSerializer(read_only=True)
+    class Meta:
+        model = Paciente
+        fields = ['telefone', 'data_cadastro', 'user'] # <--- Correção: Removido 'user_ptr_id'

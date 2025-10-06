@@ -7,6 +7,8 @@ import 'package:medlink/views/pages/admin.dart';
 import '../models/user_model.dart';
 import '../models/appointment_model.dart';
 import '../models/dashboard_stats_model.dart';
+import '../models/patient_model.dart';
+import '../models/doctor_model.dart';
 
 class ApiService {
   final String baseUrl = kIsWeb
@@ -236,5 +238,46 @@ class ApiService {
       },
       body: jsonEncode(data),
     );
+  }
+  // --- NOVOS MÉTODOS CORRIGIDOS ---
+
+  Future<List<Patient>> getPatients(String accessToken) async {
+    // 👇 CORREÇÃO: Caminho sem o /api duplicado
+    final url = Uri.parse("$baseUrl/pacientes/");
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      if (response.body == "[]" || response.body.isEmpty) return [];
+      final List<dynamic> jsonList = json.decode(
+        utf8.decode(response.bodyBytes),
+      );
+      return jsonList.map((json) => Patient.fromJson(json)).toList();
+    } else {
+      throw Exception(
+        'Falha ao carregar pacientes (Status: ${response.statusCode})',
+      );
+    }
+  }
+
+  Future<List<Doctor>> getDoctors(String accessToken) async {
+    // 👇 CORREÇÃO: Caminho sem o /api duplicado
+    final url = Uri.parse("$baseUrl/medicos/");
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      if (response.body == "[]" || response.body.isEmpty) return [];
+      final List<dynamic> jsonList = json.decode(
+        utf8.decode(response.bodyBytes),
+      );
+      return jsonList.map((json) => Doctor.fromJson(json)).toList();
+    } else {
+      throw Exception(
+        'Falha ao carregar médicos (Status: ${response.statusCode})',
+      );
+    }
   }
 }

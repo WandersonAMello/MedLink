@@ -8,6 +8,10 @@ import '../../models/consulta_dashboard_model.dart';
 import '../../services/api_service.dart';
 import '../../models/dashboard_stats_model.dart';
 import 'package:medlink/models/appointment_model.dart';
+import 'package:medlink/models/patient_model.dart';
+import 'package:medlink/models/doctor_model.dart';
+import '../../models/patient_model.dart';
+import '../../models/doctor_model.dart';
 
 class SecretaryDashboard extends StatefulWidget {
   final VoidCallback? onLogout;
@@ -31,6 +35,8 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
 
   List<Appointment> _allAppointments = []; // Guarda a lista original da API
   List<Appointment> _filteredAppointments = []; // Lista exibida na tela
+  List<Patient> _patients = [];
+  List<Doctor> _doctors = [];
   DashboardStats? _stats;
   bool _isLoading = true;
   String _secretaryName = 'Secretária'; // Nome padrão
@@ -95,6 +101,8 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
       final results = await Future.wait([
         _apiService.getDashboardStats(accessToken),
         _apiService.getAppointments(accessToken),
+        _apiService.getPatients(accessToken),
+        _apiService.getDoctors(accessToken),
       ]);
 
       if (!mounted) return;
@@ -103,6 +111,8 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
         _stats = results[0] as DashboardStats;
         _allAppointments = results[1] as List<Appointment>;
         _filteredAppointments = _allAppointments;
+        _patients = results[2] as List<Patient>;
+        _doctors = results[3] as List<Doctor>;
       });
     } catch (e) {
       if (!mounted) return;
@@ -514,10 +524,245 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     );
   }
 
-  // A implementação do modal de nova consulta (_showNewAppointmentDialog) continua a mesma
+  // Em _SecretaryDashboardState
+
   void _showNewAppointmentDialog() {
-    // ... cole aqui o código funcional do modal que já fizemos
+    Patient? selectedPatient;
+    Doctor? selectedDoctor;
+    DateTime? selectedDate;
+    TimeOfDay? selectedTime;
+    final valorController = TextEditingController();
+    final typeController = TextEditingController();
+    bool isDialogLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Novo Agendamento'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<Patient>(
+                      hint: const Text('Selecione o Paciente'),
+                      value: selectedPatient,
+                      items: _patients.map((patient) {
+                        return DropdownMenuItem(
+                          value: patient,
+                          child: Text(
+                            patient.fullName,
+                          ), // <-- Corrigido para fullName
+                        );
+                      }).toList(),
+                      onChanged: (value) =>
+                          setDialogState(() => selectedPatient = value),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<Doctor>(
+                      hint: const Text('Selecione o Médico'),
+                      value: selectedDoctor,
+                      items: _doctors
+                          .map(
+                            (doctor) => DropdownMenuItem(
+                              value: doctor,
+                              child: Text(doctor.fullName),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setDialogState(() => selectedDoctor = value),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: typeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo de Consulta',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: valorController,
+                      decoration: const InputDecoration(labelText: 'Valor'),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.calendar_today),
+                            label: Text(
+                              selectedDate == null
+                                  ? 'Data'
+                                  : DateFormat(
+                                      'dd/MM/yyyy',
+                                    ).format(selectedDate!),
+                            ),
+                            onPressed: () async {
+                              final date = await showDatePicker(
+                                context: context,
+                                initialDate: DateTime.now(),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365),
+                                ),
+                              );
+                              if (date != null)
+                                setDialogState(() => selectedDate = date);
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.access_time),
+                            label: Text(
+                              selectedTime == null
+                                  ? 'Hora'
+                                  : selectedTime!.format(context),
+                            ),
+                            onPressed: () async {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.now(),
+                              );
+                              if (time != null)
+                                setDialogState(() => selectedTime = time);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          if (selectedPatient == null ||
+                              selectedDoctor == null ||
+                              selectedDate == null ||
+                              selectedTime == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Preencha todos os campos'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          setDialogState(() => isDialogLoading = true);
+                          try {
+                            final accessToken = await _storage.read(
+                              key: 'access_token',
+                            );
+                            if (accessToken == null)
+                              throw Exception('Token não encontrado');
+
+                            final appointmentDateTime = DateTime(
+                              selectedDate!.year,
+                              selectedDate!.month,
+                              selectedDate!.day,
+                              selectedTime!.hour,
+                              selectedTime!.minute,
+                            );
+                            final newAppointment = Appointment(
+                              id: 0, // O ID é gerado pelo backend
+                              dateTime: appointmentDateTime,
+                              status: 'PENDENTE',
+                              valor:
+                                  double.tryParse(valorController.text) ?? 0.0,
+                              patientName: '',
+                              doctorName: '',
+                              type: typeController.text,
+                              patientId: selectedPatient!.id,
+                              doctorId: selectedDoctor!.id,
+                              clinicId: 1, // TODO: Pegar o ID da clínica logada
+                            );
+
+                            final response = await _apiService
+                                .createAppointment(newAppointment, accessToken);
+
+                            if (!mounted) return;
+                            if (response.statusCode == 201) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Agendamento criado com sucesso!',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _fetchAppointments(); // Atualiza a lista
+                            } else {
+                              throw Exception(
+                                'Falha ao criar agendamento: ${response.body}',
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted)
+                              setDialogState(() => isDialogLoading = false);
+                          }
+                        },
+                  child: isDialogLoading
+                      ? const CircularProgressIndicator()
+                      : const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   // As funções de confirmar e cancelar (_confirmAppointment, _cancelAppointment, etc.) continuam as mesmas
+
+  // Em _SecretaryDashboardState
+
+  Future<void> _fetchAppointments() async {
+    // Renomeado para refletir que busca tudo
+    setState(() => _isLoading = true);
+    try {
+      final accessToken = await _storage.read(key: 'access_token');
+      if (accessToken == null) throw Exception('Token não encontrado');
+
+      // Busca todos os dados necessários em paralelo
+      final results = await Future.wait([
+        _apiService.getAppointments(accessToken),
+        _apiService.getPatients(accessToken),
+        _apiService.getDoctors(accessToken),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _allAppointments = results[0] as List<Appointment>;
+        _filterAppointments(); // Aplica o filtro após atualizar a lista completa
+        _patients = results[1] as List<Patient>;
+        _doctors = results[2] as List<Doctor>;
+      });
+    } catch (e) {
+      // ... (seu tratamento de erro)
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 }
