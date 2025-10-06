@@ -8,10 +8,10 @@ import 'package:intl/intl.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../../services/api_service.dart'; // Garanta que este import está correto
 
-// --- MODELO E SERVIÇO ---
-// Em seu projeto, estes estarão em arquivos separados. O ApiService deve ser importado.
+// SUBSTITUA SEU ENUM POR ESTE
+enum UserRole { secretaria, medico, admin, financeiro, paciente }
 
-// Model para usuário admin
+// SUBSTITUA SUA CLASSE AdminUser POR ESTA
 class AdminUser {
   final String id;
   final String name;
@@ -37,9 +37,7 @@ class AdminUser {
     this.lastLogin,
   });
 
-  // 👇 CONSTRUTOR "BLINDADO" CONTRA VALORES NULOS 👇
   factory AdminUser.fromJson(Map<String, dynamic> json) {
-    // Tenta pegar o nome completo, se não vier, constrói a partir de first_name e last_name
     String fullName =
         json['full_name'] ??
         '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim();
@@ -48,33 +46,26 @@ class AdminUser {
     }
 
     return AdminUser(
-      id:
-          json['id']?.toString() ??
-          '0', // Usa '?' para ser seguro e dá um padrão '0'
+      id: json['id']?.toString() ?? '0',
       name: fullName,
-      cpf: json['cpf'] ?? '', // Se for nulo, usa string vazia
-      email: json['email'] ?? '', // Se for nulo, usa string vazia
+      cpf: json['cpf'] ?? '',
+      email: json['email'] ?? '',
+      // 👇 LÓGICA DE CONVERSÃO CORRIGIDA 👇
       role: UserRole.values.firstWhere(
-        // Converte para maiúsculo para bater com o enum
-        (e) =>
-            e.name.toUpperCase() ==
-            (json['user_type'] as String? ?? '').toUpperCase(),
-        orElse: () => UserRole.patient, // Padrão se o tipo não for reconhecido
+        // Agora a comparação direta (minúsculo vs minúsculo) vai funcionar
+        (e) => e.name == (json['user_type'] as String? ?? '').toLowerCase(),
+        orElse: () => UserRole.paciente, // O padrão continua sendo 'paciente'
       ),
-      specialty: json['specialty'], // Já é anulável, então é seguro
-      crm: json['crm'], // Já é anulável, então é seguro
-      isActive: json['is_active'] ?? false, // Se for nulo, assume como 'false'
-      // Usa tryParse que não quebra se o valor for nulo ou inválido
+      specialty: json['specialty'],
+      crm: json['crm'],
+      isActive: json['is_active'] ?? false,
       createdAt: DateTime.tryParse(json['date_joined'] ?? '') ?? DateTime.now(),
-
       lastLogin: json['last_login'] != null
           ? DateTime.tryParse(json['last_login'])
           : null,
     );
   }
 }
-
-enum UserRole { secretary, doctor, admin, financial, patient }
 
 // --- FIM DOS MODELOS ---
 
@@ -161,11 +152,15 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   List<AdminUser> get _filteredUsers {
     return _allUsers.where((user) {
+      final searchTermLower = _searchTerm.toLowerCase();
+
+      // Adicionamos '?? ''' para garantir que não haverá erro se um campo for nulo
       final matchesSearch =
           _searchTerm.isEmpty ||
-          user.name.toLowerCase().contains(_searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().contains(_searchTerm.toLowerCase()) ||
-          user.cpf.contains(_searchTerm);
+          (user.name ?? '').toLowerCase().contains(searchTermLower) ||
+          (user.email ?? '').toLowerCase().contains(searchTermLower) ||
+          (user.cpf ?? '').contains(searchTermLower);
+
       final matchesRole = _filterRole == null || user.role == _filterRole;
       return matchesSearch && matchesRole;
     }).toList();
@@ -175,25 +170,26 @@ class _AdminDashboardState extends State<AdminDashboard>
     return {
       'total': _allUsers.length,
       'active': _allUsers.where((u) => u.isActive).length,
-      'doctors': _allUsers.where((u) => u.role == UserRole.doctor).length,
+      'doctors': _allUsers.where((u) => u.role == UserRole.medico).length,
       'secretaries': _allUsers
-          .where((u) => u.role == UserRole.secretary)
+          .where((u) => u.role == UserRole.secretaria)
           .length,
-      'patients': _allUsers.where((u) => u.role == UserRole.patient).length,
+      'patients': _allUsers.where((u) => u.role == UserRole.paciente).length,
     };
   }
 
+  // Em _AdminDashboardState
   Map<String, dynamic> _getRoleConfig(UserRole role) {
     switch (role) {
       case UserRole.admin:
         return {'label': 'Admin', 'color': Colors.purple};
-      case UserRole.doctor:
+      case UserRole.medico: // <-- Corrigido
         return {'label': 'Médico', 'color': Colors.blue};
-      case UserRole.secretary:
+      case UserRole.secretaria: // <-- Corrigido
         return {'label': 'Secretária', 'color': Colors.green};
-      case UserRole.financial:
+      case UserRole.financeiro: // <-- Corrigido
         return {'label': 'Financeiro', 'color': Colors.orange};
-      case UserRole.patient:
+      case UserRole.paciente: // <-- Corrigido
         return {'label': 'Paciente', 'color': Colors.grey};
     }
   }
@@ -600,7 +596,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    user.name,
+                                    user.name ?? 'Sem nome',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -616,8 +612,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                                 ],
                               ),
                             ),
-                            DataCell(Text(user.cpf)),
-                            DataCell(Text(user.email)),
+                            DataCell(Text(user.cpf ?? '')),
+                            DataCell(Text(user.email ?? '')),
                             DataCell(
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -625,7 +621,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: roleConfig['color'].withOpacity(0.1),
+                                  color: (roleConfig['color'] as Color)
+                                      .withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
