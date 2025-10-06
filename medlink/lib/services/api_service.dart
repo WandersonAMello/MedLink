@@ -183,4 +183,24 @@ class ApiService {
       headers: {'Authorization': 'Bearer $accessToken'},
     );
   }
+
+  // Em lib/services/api_service.dart
+
+  // ... (seus métodos existentes: getClinicUsers, etc.)
+
+  /// Cria um novo usuário da clínica (Secretária, Médico, etc.).
+  Future<http.Response> createClinicUser(
+    Map<String, dynamic> userData,
+    String accessToken,
+  ) async {
+    final url = Uri.parse("$baseUrl/admin/users/");
+    return await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode(userData),
+    );
+  }
 }

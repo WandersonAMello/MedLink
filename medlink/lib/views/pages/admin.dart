@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
@@ -519,15 +520,26 @@ class _AdminDashboardState extends State<AdminDashboard>
                   ),
                 ],
               ),
+              // Em _AdminDashboardState, dentro do método _buildUsersTab
               ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add, color: Colors.white),
+                onPressed: _showCreateUserDialog,
+                icon: const Icon(
+                  Icons.add,
+                  size: 16,
+                  color: Colors.white,
+                ), // ícone branco
                 label: const Text(
                   'Novo Usuário',
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: Colors.white), // texto branco
                 ),
-                style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor, // cor de fundo do botão
+                  foregroundColor: Colors
+                      .white, // garante que o texto e o ícone fiquem brancos
+                ),
               ),
+
+              //...
             ],
           ),
           const SizedBox(height: 16),
@@ -818,6 +830,213 @@ class _AdminDashboardState extends State<AdminDashboard>
           ),
         ),
       ),
+    );
+  }
+  // Em _AdminDashboardState, substitua a função inteira
+
+  void _showCreateUserDialog() {
+    final formKey = GlobalKey<FormState>();
+    // Controladores para todos os campos possíveis
+    final firstNameController = TextEditingController();
+    final lastNameController = TextEditingController();
+    final cpfController = TextEditingController();
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final clinicaIdController = TextEditingController();
+    final crmController = TextEditingController();
+    final especialidadeController = TextEditingController();
+
+    UserRole selectedRole = UserRole.secretaria; // Valor padrão
+    bool isDialogLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Criar Novo Usuário'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: firstNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Primeiro Nome',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: lastNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Último Nome',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: cpfController,
+                        decoration: const InputDecoration(labelText: 'CPF'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: emailController,
+                        decoration: const InputDecoration(labelText: 'E-mail'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: passwordController,
+                        decoration: const InputDecoration(labelText: 'Senha'),
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<UserRole>(
+                        value: selectedRole,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo de Usuário',
+                        ),
+                        items: UserRole.values.map((role) {
+                          return DropdownMenuItem(
+                            value: role,
+                            child: Text(_getRoleConfig(role)['label']),
+                          );
+                        }).toList(),
+                        onChanged: (role) {
+                          if (role != null) {
+                            setDialogState(() => selectedRole = role);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // --- CAMPOS DINÂMICOS APARECEM AQUI ---
+
+                      // Campo de Clínica (aparece para Secretária e Médico)
+                      if (selectedRole == UserRole.secretaria ||
+                          selectedRole == UserRole.medico) ...[
+                        TextFormField(
+                          controller: clinicaIdController,
+                          decoration: const InputDecoration(
+                            labelText: 'ID da Clínica',
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+
+                        // Campos de Médico (aparecem apenas para Médico)
+                      ],
+                      if (selectedRole == UserRole.medico) ...[
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: crmController,
+                          decoration: const InputDecoration(labelText: 'CRM'),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: especialidadeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Especialidade',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          // A validação continua a mesma
+                          if (!(formKey.currentState?.validate() ?? false))
+                            return;
+
+                          setDialogState(() => isDialogLoading = true);
+
+                          try {
+                            final accessToken = await _storage.read(
+                              key: 'access_token',
+                            );
+                            if (accessToken == null)
+                              throw Exception('Token não encontrado');
+
+                            // --- MONTAGEM DINÂMICA DO JSON ---
+                            final Map<String, dynamic> userData = {
+                              "cpf": cpfController.text,
+                              "email": emailController.text,
+                              "first_name": firstNameController.text,
+                              "last_name": lastNameController.text,
+                              "password": passwordController.text,
+                              "user_type": selectedRole.name.toUpperCase(),
+                            };
+
+                            if (selectedRole == UserRole.secretaria ||
+                                selectedRole == UserRole.medico) {
+                              userData['clinica_id'] = int.tryParse(
+                                clinicaIdController.text,
+                              );
+                            }
+                            if (selectedRole == UserRole.medico) {
+                              userData['crm'] = crmController.text;
+                              userData['especialidade'] =
+                                  especialidadeController.text.toUpperCase();
+                            }
+
+                            final response = await _apiService.createClinicUser(
+                              userData,
+                              accessToken,
+                            );
+
+                            if (!mounted) return;
+                            if (response.statusCode == 201) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Usuário criado com sucesso!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _loadInitialData(); // Atualiza a lista de usuários
+                            } else {
+                              final error = (utf8.decode(response.bodyBytes),);
+                              throw Exception('Falha ao criar usuário: $error');
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted)
+                              setDialogState(() => isDialogLoading = false);
+                          }
+                        },
+                  child: isDialogLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
