@@ -46,3 +46,20 @@ class HasRole(BasePermission):
         # Verifica se o usuário está autenticado e se o seu 'user_type'
         # está na lista de papéis permitidos para esta view.
         return user and user.is_authenticated and user.user_type in required_roles
+    
+class IsAdminOrReadOnly(BasePermission):
+    """
+    Permissão personalizada que permite acesso total a administradores
+    e apenas leitura para outros usuários autenticados.
+    """
+    def has_permission(self, request, view):
+        # Permite acesso total se o usuário for administrador
+        if request.user and request.user.is_staff:
+            return True
+        
+        # Permite apenas métodos de leitura (GET, HEAD, OPTIONS) para outros usuários autenticados
+        if request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return request.user and request.user.is_authenticated
+        
+        # Nega o acesso para outros métodos (POST, PUT, DELETE) para usuários não administradores
+        return False
