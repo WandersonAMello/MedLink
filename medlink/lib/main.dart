@@ -44,6 +44,7 @@ class MyApp extends StatelessWidget {
         '/AdminDashboard': (context) => const AdminDashboard(),
         '/SecretariaDashboard': (context) => const SecretaryDashboard(), // já existia
         '/MedicoDashboard': (context) => const MedicoDashboardPage(), // NOVA rota do médico
+        //'/': (context) => const MedicoDashboardPage(), // NOVA rota do médico
       },
     );
   }

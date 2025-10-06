@@ -35,7 +35,7 @@ class _LoginPageState extends State<LoginPage> {
         const SnackBar(content: Text("Login realizado com sucesso!")),
       );
       // Navegação segura
-      Navigator.pushReplacementNamed(context, "/home");
+      Navigator.pushReplacementNamed(context, "/MedicoDashboard");
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Usuário ou senha incorretos")),
