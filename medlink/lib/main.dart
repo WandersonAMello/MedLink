@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:medlink/views/pages/home_page.dart';
 import 'package:provider/provider.dart';
 
 // Views
@@ -56,7 +57,7 @@ class MyApp extends StatelessWidget {
           final userId = ModalRoute.of(context)?.settings.arguments as String;
           return AdminEditUserPage(userId: userId);
         },
-
+        '/user/dashboard': (context) => const HomePage(),
         // TODO: Adicione as rotas para os outros perfis aqui quando as telas existirem
         // '/patient/dashboard': (context) => const PatientDashboard(),
       },

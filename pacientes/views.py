@@ -1,4 +1,4 @@
-# pacientes/views.py (VERSÃO CORRIGIDA)
+# pacientes/views.py (VERSÃO CORRIGIDA E SIMPLIFICADA)
 
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -8,31 +8,22 @@ from django.utils import timezone
 from .models import Paciente
 from agendamentos.models import Consulta
 from users.permissions import IsMedicoOrSecretaria
-from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticated
-from .models import Paciente
-from .serializers import PacienteCreateSerializer, PacienteSerializer
+from .serializers import PacienteCreateSerializer # <--- Importa o serializer correto
 
-
-# View para criar pacientes
+# View para CRIAR pacientes (não muda)
 class PacienteCreateView(generics.CreateAPIView):
     queryset = Paciente.objects.all()
     serializer_class = PacienteCreateSerializer
-    permission_classes = [AllowAny] # Permite o cadastro sem autenticação
+    permission_classes = [AllowAny]
 
-# 👇 ADICIONE ESTA NOVA VIEW 👇
-class PacienteListView(ListAPIView):
-    """
-    View para listar todos os pacientes.
-    Acessível apenas por usuários autenticados.
-    """
+# View para LISTAR todos os pacientes (não muda)
+class PacienteListView(generics.ListAPIView):
     queryset = Paciente.objects.select_related('user').all()
-    queryset = Paciente.objects.all()
-    serializer_class = PacienteCreateSerializer  # <-- usa o serializer correto!
-    permission_classes = [AllowAny]  # Permite o cadastro sem autenticação
+    serializer_class = PacienteCreateSerializer
+    permission_classes = [IsAuthenticated]
 
 
-# --- CLASSE ATUALIZADA PARA INCLUIR DADOS DA CONSULTA ---
+# --- VIEW DOS PACIENTES DO DIA (CORRIGIDA) ---
 
 class PacientesDoDiaAPIView(APIView):
     """
@@ -48,29 +39,23 @@ class PacientesDoDiaAPIView(APIView):
         consultas_de_hoje = Consulta.objects.filter(
             medico=medico,
             data_hora__date=hoje
-        ).select_related('paciente__user', 'medico__perfil_medico').order_by('data_hora') # Otimização da query
+        ).select_related('paciente__user', 'medico__perfil_medico').order_by('data_hora')
         
-        pacientes_com_horario = {}
-        for consulta in consultas_de_hoje:
-            if consulta.paciente not in pacientes_com_horario:
-                # Armazena o paciente e os dados da sua primeira consulta do dia
-                pacientes_com_horario[consulta.paciente] = {
-                    "horario": consulta.data_hora,
-                    "status": consulta.status_atual,
-                    # --- NOVOS CAMPOS ADICIONADOS ---
-                    "profissional": consulta.medico.get_full_name(),
-                    "especialidade": consulta.medico.perfil_medico.get_especialidade_display()
-                }
+        # Extrai a lista de pacientes a partir das consultas
+        pacientes_de_hoje = [consulta.paciente for consulta in consultas_de_hoje]
 
-        dados_serializaveis = []
-        for paciente, dados_consulta in pacientes_com_horario.items():
-            paciente_data = PacienteSerializer(paciente).data
-            # Adiciona os dados específicos da consulta do dia
-            paciente_data['horario'] = dados_consulta['horario']
-            paciente_data['status'] = dados_consulta['status']
-            # --- NOVOS CAMPOS ADICIONADOS ---
-            paciente_data['profissional'] = dados_consulta['profissional']
-            paciente_data['especialidade'] = dados_consulta['especialidade']
-            dados_serializaveis.append(paciente_data)
+        # Usa o PacienteCreateSerializer para formatar a resposta
+        # O método to_representation dele já cria o JSON "plano" que o Flutter espera
+        serializer = PacienteCreateSerializer(pacientes_de_hoje, many=True)
             
-        return Response(dados_serializaveis, status=status.HTTP_200_OK)
+        # Adiciona manualmente os dados da consulta que não estão no serializer
+        dados_finais = []
+        for i, paciente_data in enumerate(serializer.data):
+            consulta_correspondente = consultas_de_hoje[i]
+            paciente_data['horario'] = consulta_correspondente.data_hora
+            paciente_data['status'] = consulta_correspondente.status_atual
+            paciente_data['profissional'] = consulta_correspondente.medico.get_full_name()
+            paciente_data['especialidade'] = consulta_correspondente.medico.perfil_medico.get_especialidade_display()
+            dados_finais.append(paciente_data)
+
+        return Response(dados_finais, status=status.HTTP_200_OK)
