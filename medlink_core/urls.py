@@ -24,10 +24,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    
-    # Rota para as operações de pacientes. O registro agora está dentro deste app.
-    path('api/pacientes/', include('pacientes.urls')),
 
+    path('api/pacientes/', include('pacientes.urls')),
     path('api/agendamentos/', include('agendamentos.urls')),
     path('api/password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
     path('api/medicos/', include('medicos.urls')),
@@ -35,5 +33,5 @@ urlpatterns = [
     path('api/secretarias/', include('secretarias.urls')),
     path('api/clinicas/', include('clinicas.urls')),
     path('api/admin/', include('administrador.urls')),
-     path("api/admin/", include("configuracoes.urls")),
+    path('api/admin/', include('configuracoes.urls')),  # se quiser manter essa rota também
 ]

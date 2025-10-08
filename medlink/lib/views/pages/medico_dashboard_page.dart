@@ -9,7 +9,6 @@ import '../widgets/paciente_card.dart';
 import '../../models/relatorio.dart';
 import '../../models/consultas.dart' as consultas_model;
 
-
 class MedicoDashboardPage extends StatelessWidget {
   const MedicoDashboardPage({super.key});
 
@@ -41,28 +40,70 @@ class MedicoDashboardPage extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextButton(onPressed: () {}, child: Text("Dashboard", style: TextStyle(color: menuTextColor("Dashboard")))),
+                TextButton(
+                  onPressed: () {},
+                  child: Text(
+                    "Dashboard",
+                    style: TextStyle(color: menuTextColor("Dashboard")),
+                  ),
+                ),
                 const SizedBox(width: 16),
-                TextButton(onPressed: () {}, child: Text("Agenda", style: TextStyle(color: menuTextColor("Agenda")))),
+                TextButton(
+                  onPressed: () {},
+                  child: Text(
+                    "Agenda",
+                    style: TextStyle(color: menuTextColor("Agenda")),
+                  ),
+                ),
                 const SizedBox(width: 16),
-                TextButton(onPressed: () {}, child: Text("Estatísticas", style: TextStyle(color: menuTextColor("Estatísticas")))),
+                TextButton(
+                  onPressed: () {},
+                  child: Text(
+                    "Estatísticas",
+                    style: TextStyle(color: menuTextColor("Estatísticas")),
+                  ),
+                ),
                 const SizedBox(width: 16),
-                TextButton(onPressed: () {}, child: Text("Configurações", style: TextStyle(color: menuTextColor("Configurações")))),
+                TextButton(
+                  onPressed: () {},
+                  child: Text(
+                    "Configurações",
+                    style: TextStyle(color: menuTextColor("Configurações")),
+                  ),
+                ),
               ],
             ),
             Row(
               children: [
-                IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none, color: Colors.white)),
+                IconButton(
+                  onPressed: () {},
+                  icon: const Icon(
+                    Icons.notifications_none,
+                    color: Colors.white,
+                  ),
+                ),
                 const SizedBox(width: 12),
-                const CircleAvatar(backgroundColor: Colors.white, child: Icon(Icons.person, color: primaryBlue)),
+                const CircleAvatar(
+                  backgroundColor: Colors.white,
+                  child: Icon(Icons.person, color: primaryBlue),
+                ),
                 const SizedBox(width: 12),
                 TextButton.icon(
                   onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/',
+                      (route) => false,
+                    );
                   },
                   icon: const Icon(Icons.logout, color: Colors.white),
-                  label: const Text("Sair", style: TextStyle(color: Colors.white)),
-                  style: ButtonStyle(overlayColor: MaterialStateProperty.all(hoverColor)),
+                  label: const Text(
+                    "Sair",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: ButtonStyle(
+                    overlayColor: MaterialStateProperty.all(hoverColor),
+                  ),
                 ),
               ],
             ),
@@ -80,18 +121,33 @@ class MedicoDashboardPage extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 12, 0, 12),
                 child: Container(
                   width: 270,
-                  decoration: BoxDecoration(color: primaryBlue, borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(
+                    color: primaryBlue,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Column(
                     children: [
                       const SizedBox(height: 12),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        child: Text("Pacientes do dia - $formattedDate", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          "Pacientes do dia - $formattedDate",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                      const Divider(color: Colors.white70, thickness: 1, height: 0),
-                      Expanded(
-                        child: buildPacientesList(pacienteController),
+                      const Divider(
+                        color: Colors.white70,
+                        thickness: 1,
+                        height: 0,
                       ),
+                      Expanded(child: buildPacientesList(pacienteController)),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Center(
@@ -100,14 +156,31 @@ class MedicoDashboardPage extends StatelessWidget {
                             child: ElevatedButton(
                               onPressed: () {},
                               style: ButtonStyle(
-                                backgroundColor: MaterialStateProperty.all(accentGreen),
-                                overlayColor: MaterialStateProperty.resolveWith<Color?>((Set<MaterialState> states) {
-                                  if (states.contains(MaterialState.hovered)) return Colors.greenAccent.withOpacity(0.3);
-                                  return null;
-                                }),
-                                shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                                backgroundColor: MaterialStateProperty.all(
+                                  accentGreen,
+                                ),
+                                overlayColor:
+                                    MaterialStateProperty.resolveWith<Color?>((
+                                      Set<MaterialState> states,
+                                    ) {
+                                      if (states.contains(
+                                        MaterialState.hovered,
+                                      ))
+                                        return Colors.greenAccent.withOpacity(
+                                          0.3,
+                                        );
+                                      return null;
+                                    }),
+                                shape: MaterialStateProperty.all(
+                                  RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
                               ),
-                              child: const Text("Reagendar dia", style: TextStyle(color: Colors.white)),
+                              child: const Text(
+                                "Reagendar dia",
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                           ),
                         ),
@@ -122,15 +195,22 @@ class MedicoDashboardPage extends StatelessWidget {
               // ---------------- Coluna central ----------------
               Expanded(
                 child: pacienteController.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : pacienteController.pacienteSelecionado == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : pacienteController.pacienteSelecionado == null
                     ? Center(
                         child: Text(
-                          pacienteController.errorMessage ?? 'Nenhum paciente para exibir.',
-                          style: const TextStyle(fontSize: 18, color: Colors.grey),
+                          pacienteController.errorMessage ??
+                              'Nenhum paciente para exibir.',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey,
+                          ),
                         ),
                       )
-                    : buildDashboardContent(context, pacienteController.pacienteSelecionado!),
+                    : buildDashboardContent(
+                        context,
+                        pacienteController.pacienteSelecionado!,
+                      ),
               ),
             ],
           ),
@@ -141,18 +221,29 @@ class MedicoDashboardPage extends StatelessWidget {
 
   Widget buildPacientesList(PacienteController controller) {
     if (controller.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
     }
     if (controller.errorMessage != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(12.0),
-          child: Text('Erro ao carregar: ${controller.errorMessage}', style: const TextStyle(color: Colors.white), textAlign: TextAlign.center),
+          child: Text(
+            'Erro ao carregar: ${controller.errorMessage}',
+            style: const TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
     if (controller.pacientes.isEmpty) {
-      return const Center(child: Text('Nenhum paciente para hoje.', style: TextStyle(color: Colors.white70)));
+      return const Center(
+        child: Text(
+          'Nenhum paciente para hoje.',
+          style: TextStyle(color: Colors.white70),
+        ),
+      );
     }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -168,13 +259,22 @@ class MedicoDashboardPage extends StatelessWidget {
     );
   }
 
-  Widget buildDashboardContent(BuildContext context, Paciente pacienteSelecionado) {
+  Widget buildDashboardContent(
+    BuildContext context,
+    Paciente pacienteSelecionado,
+  ) {
     // A variável 'historico' pode ser usada mais tarde para a lista de histórico
-    final historico = pacienteSelecionado.consultasHistoricas; 
+    final historico = pacienteSelecionado.consultasHistoricas;
 
     final historicoRelatorios = [
-      Relatorio(titulo: 'Relatório Exemplo 1', conteudo: 'Conteúdo do relatório 1...'),
-      Relatorio(titulo: 'Relatório Exemplo 2', conteudo: 'Conteúdo do relatório 2...'),
+      Relatorio(
+        titulo: 'Relatório Exemplo 1',
+        conteudo: 'Conteúdo do relatório 1...',
+      ),
+      Relatorio(
+        titulo: 'Relatório Exemplo 2',
+        conteudo: 'Conteúdo do relatório 2...',
+      ),
     ];
 
     return Padding(
@@ -189,18 +289,41 @@ class MedicoDashboardPage extends StatelessWidget {
                 Flexible(
                   flex: 2,
                   child: Container(
-                    decoration: BoxDecoration(color: MedicoDashboardPage.primaryBlue, borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                      color: MedicoDashboardPage.primaryBlue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const CircleAvatar(radius: 30, child: Icon(Icons.person, size: 40, color: MedicoDashboardPage.primaryBlue)),
+                          const CircleAvatar(
+                            radius: 30,
+                            child: Icon(
+                              Icons.person,
+                              size: 40,
+                              color: MedicoDashboardPage.primaryBlue,
+                            ),
+                          ),
                           const SizedBox(height: 12),
-                          Text(pacienteSelecionado.nome, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text(
+                            pacienteSelecionado.nome,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 6),
-                          Text(pacienteSelecionado.telefone, style: const TextStyle(color: Colors.white70)),
+                          Text(
+                            pacienteSelecionado.telefone,
+                            style: const TextStyle(color: Colors.white70),
+                          ),
                           const SizedBox(height: 4),
-                          Text(pacienteSelecionado.email, style: const TextStyle(color: Colors.white70)),
+                          Text(
+                            pacienteSelecionado.email,
+                            style: const TextStyle(color: Colors.white70),
+                          ),
                         ],
                       ),
                     ),
@@ -213,24 +336,42 @@ class MedicoDashboardPage extends StatelessWidget {
                   width: 300, // 1. CORREÇÃO DE LAYOUT: Tamanho fixo restaurado
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: MedicoDashboardPage.primaryBlue, borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                      color: MedicoDashboardPage.primaryBlue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Informações da Consulta", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        const Text(
+                          "Informações da Consulta",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         // 2. CORREÇÃO DE DADOS: Usando os campos corretos do paciente
-                        Text("Data/Hora: ${DateFormat('dd/MM/yyyy HH:mm').format(pacienteSelecionado.horario)}", style: const TextStyle(color: Colors.white70)),
+                        Text(
+                          "Data/Hora: ${DateFormat('dd/MM/yyyy HH:mm').format(pacienteSelecionado.horario)}",
+                          style: const TextStyle(color: Colors.white70),
+                        ),
                         const SizedBox(height: 6),
-                        Text("Especialidade: ${pacienteSelecionado.especialidade}", style: const TextStyle(color: Colors.white70)),
+                        Text(
+                          "Especialidade: ${pacienteSelecionado.especialidade}",
+                          style: const TextStyle(color: Colors.white70),
+                        ),
                         const SizedBox(height: 6),
-                        Text("Profissional: ${pacienteSelecionado.profissional}", style: const TextStyle(color: Colors.white70)),
+                        Text(
+                          "Profissional: ${pacienteSelecionado.profissional}",
+                          style: const TextStyle(color: Colors.white70),
+                        ),
                       ],
                     ),
                   ),
                 ),
-
               ],
             ),
           ),
@@ -244,11 +385,21 @@ class MedicoDashboardPage extends StatelessWidget {
                   flex: 2,
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: MedicoDashboardPage.primaryBlue, borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                      color: MedicoDashboardPage.primaryBlue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Anotações", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        const Text(
+                          "Anotações",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         const Expanded(
                           child: TextField(
@@ -258,7 +409,12 @@ class MedicoDashboardPage extends StatelessWidget {
                               filled: true,
                               fillColor: Colors.white,
                               hintText: "Digite suas anotações...",
-                              border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(8),
+                                ),
+                                borderSide: BorderSide.none,
+                              ),
                             ),
                             textAlignVertical: TextAlignVertical.top,
                           ),
@@ -266,7 +422,13 @@ class MedicoDashboardPage extends StatelessWidget {
                         const SizedBox(height: 8),
                         Align(
                           alignment: Alignment.bottomRight,
-                          child: ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: MedicoDashboardPage.accentGreen), child: const Text("Salvar")),
+                          child: ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: MedicoDashboardPage.accentGreen,
+                            ),
+                            child: const Text("Salvar"),
+                          ),
                         ),
                       ],
                     ),
@@ -277,11 +439,21 @@ class MedicoDashboardPage extends StatelessWidget {
                   flex: 1,
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: MedicoDashboardPage.primaryBlue, borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                      color: MedicoDashboardPage.primaryBlue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Histórico de relatórios", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        const Text(
+                          "Histórico de relatórios",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         Expanded(
                           child: ListView.builder(
@@ -289,13 +461,23 @@ class MedicoDashboardPage extends StatelessWidget {
                             itemBuilder: (context, index) {
                               final relatorio = historicoRelatorios[index];
                               return ListTile(
-                                title: Text(relatorio.titulo, style: const TextStyle(color: Colors.white70)),
+                                title: Text(
+                                  relatorio.titulo,
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
                                 onTap: () => showDialog(
                                   context: context,
                                   builder: (context) => AlertDialog(
                                     title: Text(relatorio.titulo),
-                                    content: SingleChildScrollView(child: Text(relatorio.conteudo)),
-                                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Fechar"))],
+                                    content: SingleChildScrollView(
+                                      child: Text(relatorio.conteudo),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text("Fechar"),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );
@@ -314,30 +496,55 @@ class MedicoDashboardPage extends StatelessWidget {
             flex: 250,
             child: Row(
               // ... (O restante do layout continua aqui, sem alterações)
-               children: [
+              children: [
                 Flexible(
                   flex: 2,
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: MedicoDashboardPage.primaryBlue, borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                      color: MedicoDashboardPage.primaryBlue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Histórico de consultas", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        const Text(
+                          "Histórico de consultas",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         Expanded(
                           child: historico.isEmpty
-                            ? const Center(child: Text("Sem consultas anteriores...", style: TextStyle(color: Colors.white70)))
-                            : ListView.builder(
-                                itemCount: historico.length,
-                                itemBuilder: (context, index) {
-                                  final consulta = historico[index];
-                                  return ListTile(
-                                    title: Text("Data/Hora: ${DateFormat('dd/MM/yyyy HH:mm').format(consulta.horario)}", style: const TextStyle(color: Colors.white70)),
-                                    subtitle: Text("Especialidade: ${consulta.especialidade}\nProfissional: ${consulta.profissional}", style: const TextStyle(color: Colors.white70)),
-                                  );
-                                },
-                              ),
+                              ? const Center(
+                                  child: Text(
+                                    "Sem consultas anteriores...",
+                                    style: TextStyle(color: Colors.white70),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: historico.length,
+                                  itemBuilder: (context, index) {
+                                    final consulta = historico[index];
+                                    return ListTile(
+                                      title: Text(
+                                        "Data/Hora: ${DateFormat('dd/MM/yyyy HH:mm').format(consulta.horario)}",
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        "Especialidade: ${consulta.especialidade}\nProfissional: ${consulta.profissional}",
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                         ),
                       ],
                     ),
@@ -348,19 +555,28 @@ class MedicoDashboardPage extends StatelessWidget {
                   flex: 1,
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: MedicoDashboardPage.primaryBlue, borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                      color: MedicoDashboardPage.primaryBlue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         ElevatedButton(
                           onPressed: () {},
-                          style: ElevatedButton.styleFrom(backgroundColor: MedicoDashboardPage.accentGreen, minimumSize: const Size(double.infinity, 40)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: MedicoDashboardPage.accentGreen,
+                            minimumSize: const Size(double.infinity, 40),
+                          ),
                           child: const Text("Reagendar Consulta"),
                         ),
                         const SizedBox(height: 12),
                         ElevatedButton(
                           onPressed: () {},
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, minimumSize: const Size(double.infinity, 40)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            minimumSize: const Size(double.infinity, 40),
+                          ),
                           child: const Text("Finalizar Consulta"),
                         ),
                       ],

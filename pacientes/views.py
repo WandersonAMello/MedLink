@@ -6,15 +6,30 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.utils import timezone
 from .models import Paciente
-from .serializers import PacienteSerializer
 from agendamentos.models import Consulta
 from users.permissions import IsMedicoOrSecretaria
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated
+from .models import Paciente
+from .serializers import PacienteCreateSerializer, PacienteSerializer
+
 
 # View para criar pacientes
 class PacienteCreateView(generics.CreateAPIView):
     queryset = Paciente.objects.all()
-    serializer_class = PacienteSerializer
-    permission_classes = [AllowAny]
+    serializer_class = PacienteCreateSerializer
+    permission_classes = [AllowAny] # Permite o cadastro sem autenticação
+
+# 👇 ADICIONE ESTA NOVA VIEW 👇
+class PacienteListView(ListAPIView):
+    """
+    View para listar todos os pacientes.
+    Acessível apenas por usuários autenticados.
+    """
+    queryset = Paciente.objects.select_related('user').all()
+    queryset = Paciente.objects.all()
+    serializer_class = PacienteCreateSerializer  # <-- usa o serializer correto!
+    permission_classes = [AllowAny]  # Permite o cadastro sem autenticação
 
 
 # --- CLASSE ATUALIZADA PARA INCLUIR DADOS DA CONSULTA ---

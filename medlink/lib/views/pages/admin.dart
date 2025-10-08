@@ -1,7 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:intl/intl.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:intl/intl.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
+import '../../services/api_service.dart'; // Garanta que este import está correto
 
-// Model para usuário admin
+// SUBSTITUA SEU ENUM POR ESTE
+enum UserRole { secretaria, medico, admin, financeiro, paciente }
+
+// SUBSTITUA SUA CLASSE AdminUser POR ESTA
 class AdminUser {
   final String id;
   final String name;
@@ -26,13 +37,41 @@ class AdminUser {
     required this.createdAt,
     this.lastLogin,
   });
+
+  factory AdminUser.fromJson(Map<String, dynamic> json) {
+    String fullName =
+        json['full_name'] ??
+        '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim();
+    if (fullName.isEmpty) {
+      fullName = 'Nome não informado';
+    }
+
+    return AdminUser(
+      id: json['id']?.toString() ?? '0',
+      name: fullName,
+      cpf: json['cpf'] ?? '',
+      email: json['email'] ?? '',
+      // 👇 LÓGICA DE CONVERSÃO CORRIGIDA 👇
+      role: UserRole.values.firstWhere(
+        // Agora a comparação direta (minúsculo vs minúsculo) vai funcionar
+        (e) => e.name == (json['user_type'] as String? ?? '').toLowerCase(),
+        orElse: () => UserRole.paciente, // O padrão continua sendo 'paciente'
+      ),
+      specialty: json['specialty'],
+      crm: json['crm'],
+      isActive: json['is_active'] ?? false,
+      createdAt: DateTime.tryParse(json['date_joined'] ?? '') ?? DateTime.now(),
+      lastLogin: json['last_login'] != null
+          ? DateTime.tryParse(json['last_login'])
+          : null,
+    );
+  }
 }
 
-enum UserRole { secretary, doctor, admin, financial, patient }
+// --- FIM DOS MODELOS ---
 
 class AdminDashboard extends StatefulWidget {
   final VoidCallback? onLogout;
-
   const AdminDashboard({Key? key, this.onLogout}) : super(key: key);
 
   @override
@@ -42,85 +81,24 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard>
     with TickerProviderStateMixin {
   late TabController _tabController;
+
+  // Variáveis de Estado para dados da API
+  final ApiService _apiService = ApiService();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  List<AdminUser> _allUsers = [];
+  bool _isLoading = true;
+  String _adminName = "Admin";
+
+  // Filtros
   String _searchTerm = '';
   UserRole? _filterRole;
-  AdminUser? _selectedUser;
 
-  // Mock data - usuários para demonstração
-  final List<AdminUser> _users = [
-    AdminUser(
-      id: '1',
-      name: 'Ana Silva',
-      cpf: '111.444.777-35',
-      email: 'ana.silva@medlink.com',
-      role: UserRole.secretary,
-      isActive: true,
-      createdAt: DateTime(2024, 1, 10),
-      lastLogin: DateTime(2024, 1, 20),
-    ),
-    AdminUser(
-      id: '2',
-      name: 'Dr. João Santos',
-      cpf: '123.456.789-09',
-      email: 'joao.santos@medlink.com',
-      role: UserRole.doctor,
-      specialty: 'Cardiologia',
-      crm: 'CRM-SP 123456',
-      isActive: true,
-      createdAt: DateTime(2024, 1, 8),
-      lastLogin: DateTime(2024, 1, 21),
-    ),
-    AdminUser(
-      id: '3',
-      name: 'Dra. Maria Costa',
-      cpf: '987.654.321-00',
-      email: 'maria.costa@medlink.com',
-      role: UserRole.doctor,
-      specialty: 'Dermatologia',
-      crm: 'CRM-SP 654321',
-      isActive: true,
-      createdAt: DateTime(2024, 1, 12),
-      lastLogin: DateTime(2024, 1, 19),
-    ),
-    AdminUser(
-      id: '4',
-      name: 'Carlos Admin',
-      cpf: '222.333.444-56',
-      email: 'admin@medlink.com',
-      role: UserRole.admin,
-      isActive: true,
-      createdAt: DateTime(2024, 1, 14),
-      lastLogin: DateTime(2024, 1, 21),
-    ),
-    AdminUser(
-      id: '5',
-      name: 'Paula Financeiro',
-      cpf: '333.444.555-68',
-      email: 'financeiro@medlink.com',
-      role: UserRole.financial,
-      isActive: true,
-      createdAt: DateTime(2024, 1, 15),
-      lastLogin: DateTime(2024, 1, 18),
-    ),
-    AdminUser(
-      id: '6',
-      name: 'Roberto Paciente',
-      cpf: '444.555.666-79',
-      email: 'roberto@email.com',
-      role: UserRole.patient,
-      isActive: false,
-      createdAt: DateTime(2024, 1, 16),
-      lastLogin: DateTime(2024, 1, 17),
-    ),
-  ];
-
-  // Configurações do sistema
+  // Configurações (mantidas no estado da tela)
   final Map<String, bool> _generalSettings = {
     'autoScheduling': true,
     'emailNotifications': true,
     'autoBackup': true,
   };
-
   final Map<String, bool> _securitySettings = {
     'twoFactor': false,
     'auditLog': true,
@@ -131,6 +109,7 @@ class _AdminDashboardState extends State<AdminDashboard>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadInitialData();
   }
 
   @override
@@ -139,69 +118,114 @@ class _AdminDashboardState extends State<AdminDashboard>
     super.dispose();
   }
 
-  // Cores do tema médico
   static const Color primaryColor = Color(0xFF0891B2);
   static const Color secondaryColor = Color(0xFF67E8F9);
   static const Color accentColor = Color(0xFFE0F2FE);
   static const Color backgroundColor = Color(0xFFF8FAFC);
 
-  // Filtrar usuários
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoading = true);
+    try {
+      final accessToken = await _storage.read(key: 'access_token');
+      if (accessToken == null)
+        throw Exception('Token não encontrado. Faça o login novamente.');
+
+      final decodedToken = JwtDecoder.decode(accessToken);
+      final usersFromApi = await _apiService.getClinicUsers(accessToken);
+
+      if (!mounted) return;
+      setState(() {
+        _adminName = decodedToken['full_name'] ?? 'Admin';
+        _allUsers = usersFromApi;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao carregar dados: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   List<AdminUser> get _filteredUsers {
-    return _users.where((user) {
+    return _allUsers.where((user) {
+      final searchTermLower = _searchTerm.toLowerCase();
+
+      // Adicionamos '?? ''' para garantir que não haverá erro se um campo for nulo
       final matchesSearch =
-          user.name.toLowerCase().contains(_searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().contains(_searchTerm.toLowerCase()) ||
-          user.cpf.contains(_searchTerm);
+          _searchTerm.isEmpty ||
+          (user.name ?? '').toLowerCase().contains(searchTermLower) ||
+          (user.email ?? '').toLowerCase().contains(searchTermLower) ||
+          (user.cpf ?? '').contains(searchTermLower);
+
       final matchesRole = _filterRole == null || user.role == _filterRole;
       return matchesSearch && matchesRole;
     }).toList();
   }
 
-  // Estatísticas
   Map<String, int> get _stats {
     return {
-      'total': _users.length,
-      'active': _users.where((u) => u.isActive).length,
-      'doctors': _users.where((u) => u.role == UserRole.doctor).length,
-      'secretaries': _users.where((u) => u.role == UserRole.secretary).length,
-      'patients': _users.where((u) => u.role == UserRole.patient).length,
+      'total': _allUsers.length,
+      'active': _allUsers.where((u) => u.isActive).length,
+      'doctors': _allUsers.where((u) => u.role == UserRole.medico).length,
+      'secretaries': _allUsers
+          .where((u) => u.role == UserRole.secretaria)
+          .length,
+      'patients': _allUsers.where((u) => u.role == UserRole.paciente).length,
     };
   }
 
-  // Configuração de badges por role
+  // Em _AdminDashboardState
   Map<String, dynamic> _getRoleConfig(UserRole role) {
     switch (role) {
       case UserRole.admin:
         return {'label': 'Admin', 'color': Colors.purple};
-      case UserRole.doctor:
+      case UserRole.medico: // <-- Corrigido
         return {'label': 'Médico', 'color': Colors.blue};
-      case UserRole.secretary:
+      case UserRole.secretaria: // <-- Corrigido
         return {'label': 'Secretária', 'color': Colors.green};
-      case UserRole.financial:
+      case UserRole.financeiro: // <-- Corrigido
         return {'label': 'Financeiro', 'color': Colors.orange};
-      case UserRole.patient:
+      case UserRole.paciente: // <-- Corrigido
         return {'label': 'Paciente', 'color': Colors.grey};
     }
   }
 
-  // Toggle status do usuário
-  void _toggleUserStatus(String userId) {
-    setState(() {
-      final userIndex = _users.indexWhere((u) => u.id == userId);
-      if (userIndex != -1) {
-        _users[userIndex].isActive = !_users[userIndex].isActive;
-      }
-    });
+  Future<void> _toggleUserStatus(String userId) async {
+    final userIndex = _allUsers.indexWhere((u) => u.id == userId);
+    if (userIndex == -1) return;
+    final originalStatus = _allUsers[userIndex].isActive;
+    final newStatus = !originalStatus;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Status do usuário atualizado'),
-        backgroundColor: primaryColor,
-      ),
-    );
+    setState(() => _allUsers[userIndex].isActive = newStatus);
+
+    try {
+      final accessToken = await _storage.read(key: 'access_token');
+      if (accessToken == null) throw Exception('Token não encontrado');
+      await _apiService.updateUserStatus(userId, newStatus, accessToken);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Status do usuário atualizado'),
+          backgroundColor: primaryColor,
+        ),
+      );
+    } catch (e) {
+      setState(
+        () => _allUsers[userIndex].isActive = originalStatus,
+      ); // Reverte em caso de erro
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao atualizar status: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
-  // Confirmar exclusão
   void _showDeleteConfirmation(AdminUser user) {
     showDialog(
       context: context,
@@ -209,8 +233,8 @@ class _AdminDashboardState extends State<AdminDashboard>
         title: Row(
           children: [
             Icon(Icons.warning, color: Colors.red[600]),
-            SizedBox(width: 8),
-            Text('Confirmar Exclusão'),
+            const SizedBox(width: 8),
+            const Text('Confirmar Exclusão'),
           ],
         ),
         content: Text(
@@ -219,15 +243,15 @@ class _AdminDashboardState extends State<AdminDashboard>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar'),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () {
-              _deleteUser(user.id);
               Navigator.pop(context);
+              _deleteUser(user.id);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text(
+            child: const Text(
               'Confirmar Exclusão',
               style: TextStyle(color: Colors.white),
             ),
@@ -237,24 +261,61 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  // Deletar usuário
-  void _deleteUser(String userId) {
-    setState(() {
-      _users.removeWhere((u) => u.id == userId);
-    });
+  // Em _AdminDashboardState
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Usuário removido com sucesso'),
-        backgroundColor: primaryColor,
-      ),
-    );
+  // Em _AdminDashboardState
+
+  Future<void> _deleteUser(String userId) async {
+    try {
+      final accessToken = await _storage.read(key: 'access_token');
+      if (accessToken == null) throw Exception('Token não encontrado');
+
+      final response = await _apiService.deleteUser(userId, accessToken);
+
+      // 204 No Content é a resposta padrão de sucesso para um DELETE
+      if (response.statusCode == 204) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Usuário removido com sucesso'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Atualiza a lista de usuários na tela após a exclusão
+        _loadInitialData();
+      } else {
+        // 👇 A LÓGICA PARA TRATAR O ERRO ACONTECE AQUI 👇
+
+        String errorMessage = "Falha ao remover usuário."; // Mensagem padrão
+
+        // Se o erro for 500, é muito provável que seja a nossa restrição de exclusão.
+        // Então, mostramos a mensagem personalizada.
+        if (response.statusCode == 500) {
+          errorMessage =
+              "Este usuário não pode ser excluído pois possui registros associados (como consultas). Considere inativá-lo.";
+        } else if (response.body.isNotEmpty) {
+          // Tenta pegar uma mensagem mais específica do backend, se houver
+          final errorBody = jsonDecode(response.body);
+          errorMessage = errorBody['detail'] ?? errorMessage;
+        }
+
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      // Mostra a mensagem de erro (seja a genérica ou a nossa personalizada)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          // O .replaceFirst remove o "Exception: " do início da mensagem
+          content: Text(e.toString().replaceFirst("Exception: ", "")),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
-  // Formatar data
   String _formatDate(DateTime? date) {
     if (date == null) return 'Nunca';
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    return DateFormat('dd/MM/yyyy').format(date);
   }
 
   @override
@@ -275,13 +336,13 @@ class _AdminDashboardState extends State<AdminDashboard>
         ),
         child: SafeArea(
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 _buildHeader(),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
                 _buildStatsCards(),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
                 Expanded(child: _buildTabSection()),
               ],
             ),
@@ -291,19 +352,18 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  // Header
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            Icon(Icons.local_hospital, size: 32, color: primaryColor),
-            SizedBox(width: 12),
+            const Icon(Icons.monitor_heart, size: 32, color: primaryColor),
+            const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'MedLink',
                   style: TextStyle(
                     fontSize: 24,
@@ -325,8 +385,8 @@ class _AdminDashboardState extends State<AdminDashboard>
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  'Carlos Admin',
-                  style: TextStyle(fontWeight: FontWeight.w500),
+                  _adminName,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
                 Text(
                   'Administrador',
@@ -334,11 +394,11 @@ class _AdminDashboardState extends State<AdminDashboard>
                 ),
               ],
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             OutlinedButton.icon(
-              onPressed: widget.onLogout,
-              icon: Icon(Icons.logout, size: 16),
-              label: Text('Sair'),
+              onPressed: _logout,
+              icon: const Icon(Icons.logout, size: 16),
+              label: const Text('Sair'),
             ),
           ],
         ),
@@ -346,63 +406,64 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  // Cards de estatísticas
   Widget _buildStatsCards() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatCard(
-            'Total Usuários',
-            _stats['total']!,
-            Icons.people,
-            primaryColor,
-          ),
-        ),
-        SizedBox(width: 16),
-        Expanded(
-          child: _buildStatCard(
-            'Ativos',
-            _stats['active']!,
-            Icons.check_circle,
-            Colors.green,
-          ),
-        ),
-        SizedBox(width: 16),
-        Expanded(
-          child: _buildStatCard(
-            'Médicos',
-            _stats['doctors']!,
-            Icons.local_hospital,
-            Colors.blue,
-          ),
-        ),
-        SizedBox(width: 16),
-        Expanded(
-          child: _buildStatCard(
-            'Secretárias',
-            _stats['secretaries']!,
-            Icons.admin_panel_settings,
-            Colors.green,
-          ),
-        ),
-        SizedBox(width: 16),
-        Expanded(
-          child: _buildStatCard(
-            'Pacientes',
-            _stats['patients']!,
-            Icons.people,
-            Colors.grey,
-          ),
-        ),
-      ],
-    );
+    return _isLoading
+        ? const SizedBox(height: 60)
+        : Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  'Total Usuários',
+                  _stats['total']!,
+                  Icons.people,
+                  primaryColor,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildStatCard(
+                  'Ativos',
+                  _stats['active']!,
+                  Icons.check_circle,
+                  Colors.green,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildStatCard(
+                  'Médicos',
+                  _stats['doctors']!,
+                  Icons.local_hospital,
+                  Colors.blue,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildStatCard(
+                  'Secretárias',
+                  _stats['secretaries']!,
+                  Icons.admin_panel_settings,
+                  Colors.teal,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildStatCard(
+                  'Pacientes',
+                  _stats['patients']!,
+                  Icons.people,
+                  Colors.grey,
+                ),
+              ),
+            ],
+          );
   }
 
   Widget _buildStatCard(String title, int value, IconData icon, Color color) {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             Container(
@@ -414,7 +475,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               ),
               child: Icon(icon, color: color, size: 20),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,7 +486,10 @@ class _AdminDashboardState extends State<AdminDashboard>
                   ),
                   Text(
                     value.toString(),
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -436,7 +500,6 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  // Seção de abas
   Widget _buildTabSection() {
     return Card(
       child: Column(
@@ -446,7 +509,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             labelColor: primaryColor,
             unselectedLabelColor: Colors.grey[600],
             indicatorColor: primaryColor,
-            tabs: [
+            tabs: const [
               Tab(text: 'Usuários'),
               Tab(text: 'Configurações'),
               Tab(text: 'Relatórios'),
@@ -467,17 +530,15 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  // Aba de usuários
   Widget _buildUsersTab() {
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              const Row(
                 children: [
                   Icon(Icons.people, color: primaryColor),
                   SizedBox(width: 8),
@@ -487,314 +548,241 @@ class _AdminDashboardState extends State<AdminDashboard>
                   ),
                 ],
               ),
+              // Em _AdminDashboardState, dentro do método _buildUsersTab
               ElevatedButton.icon(
-                onPressed: () {
-                  // Implementar novo usuário
-                },
-                icon: Icon(Icons.add),
-                label: Text('Novo Usuário'),
-                style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                onPressed: _showCreateUserDialog,
+                icon: const Icon(
+                  Icons.add,
+                  size: 16,
+                  color: Colors.white,
+                ), // ícone branco
+                label: const Text(
+                  'Novo Usuário',
+                  style: TextStyle(color: Colors.white), // texto branco
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor, // cor de fundo do botão
+                  foregroundColor: Colors
+                      .white, // garante que o texto e o ícone fiquem brancos
+                ),
               ),
+
+              //...
             ],
           ),
-          SizedBox(height: 16),
-
-          // Filtros
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
                 child: TextField(
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Buscar por nome, email ou CPF...',
                     prefixIcon: Icon(Icons.search),
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchTerm = value;
-                    });
-                  },
+                  onChanged: (value) => setState(() => _searchTerm = value),
                 ),
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               SizedBox(
                 width: 200,
                 child: DropdownButtonFormField<UserRole?>(
                   value: _filterRole,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Filtrar por tipo',
                     border: OutlineInputBorder(),
                   ),
                   items: [
-                    DropdownMenuItem(
+                    const DropdownMenuItem(
                       value: null,
                       child: Text('Todos os tipos'),
                     ),
-                    DropdownMenuItem(
-                      value: UserRole.admin,
-                      child: Text('Administrador'),
-                    ),
-                    DropdownMenuItem(
-                      value: UserRole.doctor,
-                      child: Text('Médico'),
-                    ),
-                    DropdownMenuItem(
-                      value: UserRole.secretary,
-                      child: Text('Secretária'),
-                    ),
-                    DropdownMenuItem(
-                      value: UserRole.financial,
-                      child: Text('Financeiro'),
-                    ),
-                    DropdownMenuItem(
-                      value: UserRole.patient,
-                      child: Text('Paciente'),
+                    ...UserRole.values.map(
+                      (role) => DropdownMenuItem(
+                        value: role,
+                        child: Text(_getRoleConfig(role)['label']),
+                      ),
                     ),
                   ],
-                  onChanged: (value) {
-                    setState(() {
-                      _filterRole = value;
-                    });
-                  },
+                  onChanged: (value) => setState(() => _filterRole = value),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
-          // Tabela
           Expanded(
-            child: SingleChildScrollView(
-              child: DataTable(
-                columnSpacing: 16,
-                columns: [
-                  DataColumn(label: Text('Nome')),
-                  DataColumn(label: Text('CPF')),
-                  DataColumn(label: Text('E-mail')),
-                  DataColumn(label: Text('Tipo')),
-                  DataColumn(label: Text('Status')),
-                  DataColumn(label: Text('Último Login')),
-                  DataColumn(label: Text('Ações')),
-                ],
-                rows: _filteredUsers.map((user) {
-                  final roleConfig = _getRoleConfig(user.role);
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              user.name,
-                              style: TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                            if (user.specialty != null)
-                              Text(
-                                user.specialty!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    // Este widget permite a rolagem VERTICAL
+                    child: SizedBox(
+                      width: double.infinity, // Ocupa toda a largura possível
+                      child: SingleChildScrollView(
+                        // E este permite a rolagem HORIZONTAL
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columnSpacing:
+                              24, // Aumenta o espaçamento entre colunas
+                          columns: const [
+                            DataColumn(label: Text('Nome')),
+                            DataColumn(label: Text('CPF')),
+                            DataColumn(label: Text('E-mail')),
+                            DataColumn(label: Text('Tipo')),
+                            DataColumn(label: Text('Status')),
+                            DataColumn(label: Text('Último Login')),
+                            DataColumn(label: Text('Ações')),
+                          ],
+                          rows: _filteredUsers.map((user) {
+                            final roleConfig = _getRoleConfig(user.role);
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        user.name ?? 'Sem nome',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      if (user.specialty != null)
+                                        Text(
+                                          user.specialty!,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                          ],
+                                DataCell(Text(user.cpf ?? '')),
+                                DataCell(Text(user.email ?? '')),
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: (roleConfig['color'] as Color)
+                                          .withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      roleConfig['label'],
+                                      style: TextStyle(
+                                        color: roleConfig['color'],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Switch(
+                                    value: user.isActive,
+                                    onChanged: (value) =>
+                                        _toggleUserStatus(user.id),
+                                    activeColor: primaryColor,
+                                  ),
+                                ),
+                                DataCell(Text(_formatDate(user.lastLogin))),
+                                DataCell(
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        onPressed: () => _editUser(user.id),
+                                        icon: const Icon(Icons.edit, size: 18),
+                                      ),
+                                      IconButton(
+                                        onPressed: () =>
+                                            _showDeleteConfirmation(user),
+                                        icon: Icon(
+                                          Icons.delete,
+                                          color: Colors.red[600],
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
                         ),
                       ),
-                      DataCell(Text(user.cpf)),
-                      DataCell(Text(user.email)),
-                      DataCell(
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: roleConfig['color'].withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            roleConfig['label'],
-                            style: TextStyle(
-                              color: roleConfig['color'],
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                      DataCell(
-                        Row(
-                          children: [
-                            Switch(
-                              value: user.isActive,
-                              onChanged: (value) => _toggleUserStatus(user.id),
-                              activeColor: primaryColor,
-                            ),
-                            Text(
-                              user.isActive ? 'Ativo' : 'Inativo',
-                              style: TextStyle(
-                                color: user.isActive
-                                    ? Colors.green
-                                    : Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      DataCell(Text(_formatDate(user.lastLogin))),
-                      DataCell(
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () {
-                                // Implementar edição
-                              },
-                              icon: Icon(Icons.edit, size: 18),
-                            ),
-                            IconButton(
-                              onPressed: () => _showDeleteConfirmation(user),
-                              icon: Icon(
-                                Icons.delete,
-                                color: Colors.red,
-                                size: 18,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  // Aba de configurações
   Widget _buildSettingsTab() {
     return Padding(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.settings, color: primaryColor),
-              SizedBox(width: 8),
-              Text(
-                'Configurações do Sistema',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      padding: const EdgeInsets.all(16),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Configurações Gerais',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
               ),
-            ],
-          ),
-          SizedBox(height: 24),
-
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Configurações Gerais
-              Expanded(
-                child: Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Configurações Gerais',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        SizedBox(height: 16),
-                        _buildSettingSwitch(
-                          'Permitir auto-agendamento',
-                          _generalSettings['autoScheduling']!,
-                          (value) => setState(
-                            () => _generalSettings['autoScheduling'] = value,
-                          ),
-                        ),
-                        _buildSettingSwitch(
-                          'Notificações por email',
-                          _generalSettings['emailNotifications']!,
-                          (value) => setState(
-                            () =>
-                                _generalSettings['emailNotifications'] = value,
-                          ),
-                        ),
-                        _buildSettingSwitch(
-                          'Backup automático',
-                          _generalSettings['autoBackup']!,
-                          (value) => setState(
-                            () => _generalSettings['autoBackup'] = value,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+            ),
+            const SizedBox(height: 12),
+            _buildSettingSwitch(
+              'Agendamento Automático',
+              _generalSettings['autoScheduling']!,
+              (val) => setState(() => _generalSettings['autoScheduling'] = val),
+            ),
+            _buildSettingSwitch(
+              'Notificações por E-mail',
+              _generalSettings['emailNotifications']!,
+              (val) =>
+                  setState(() => _generalSettings['emailNotifications'] = val),
+            ),
+            _buildSettingSwitch(
+              'Backup Automático',
+              _generalSettings['autoBackup']!,
+              (val) => setState(() => _generalSettings['autoBackup'] = val),
+            ),
+            const Divider(height: 32),
+            const Text(
+              'Configurações de Segurança',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
               ),
-
-              SizedBox(width: 16),
-
-              // Configurações de Segurança
-              Expanded(
-                child: Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Segurança',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        SizedBox(height: 16),
-                        _buildSettingSwitch(
-                          'Autenticação 2FA',
-                          _securitySettings['twoFactor']!,
-                          (value) => setState(
-                            () => _securitySettings['twoFactor'] = value,
-                          ),
-                        ),
-                        _buildSettingSwitch(
-                          'Log de auditoria',
-                          _securitySettings['auditLog']!,
-                          (value) => setState(
-                            () => _securitySettings['auditLog'] = value,
-                          ),
-                        ),
-                        _buildSettingSwitch(
-                          'Sessão automática',
-                          _securitySettings['autoSession']!,
-                          (value) => setState(
-                            () => _securitySettings['autoSession'] = value,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Configurações salvas com sucesso'),
-                  backgroundColor: primaryColor,
-                ),
-              );
-            },
-            child: Text('Salvar Configurações'),
-            style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-          ),
-        ],
+            ),
+            const SizedBox(height: 12),
+            _buildSettingSwitch(
+              'Autenticação de Dois Fatores',
+              _securitySettings['twoFactor']!,
+              (val) => setState(() => _securitySettings['twoFactor'] = val),
+            ),
+            _buildSettingSwitch(
+              'Registro de Auditoria',
+              _securitySettings['auditLog']!,
+              (val) => setState(() => _securitySettings['auditLog'] = val),
+            ),
+            _buildSettingSwitch(
+              'Sessão Automática',
+              _securitySettings['autoSession']!,
+              (val) => setState(() => _securitySettings['autoSession'] = val),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -804,76 +792,313 @@ class _AdminDashboardState extends State<AdminDashboard>
     bool value,
     ValueChanged<bool> onChanged,
   ) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title),
-          Switch(value: value, onChanged: onChanged, activeColor: primaryColor),
-        ],
-      ),
+    return SwitchListTile(
+      title: Text(title),
+      value: value,
+      onChanged: onChanged,
+      activeColor: primaryColor,
+      contentPadding: EdgeInsets.zero,
     );
   }
 
-  // Aba de relatórios
   Widget _buildReportsTab() {
     return Padding(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.analytics, color: primaryColor),
-              SizedBox(width: 8),
-              Text(
-                'Relatórios do Sistema',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      padding: const EdgeInsets.all(16),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Relatórios',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
               ),
-            ],
-          ),
-          SizedBox(height: 24),
-
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              _buildReportCard('Relatório de Usuários', Icons.people, () {}),
-              _buildReportCard('Atividade do Sistema', Icons.analytics, () {}),
-              _buildReportCard('Log de Segurança', Icons.security, () {}),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                _buildReportCard('Relatório de Usuários', Icons.people, () {}),
+                _buildReportCard(
+                  'Relatório de Consultas',
+                  Icons.event_note,
+                  () {},
+                ),
+                _buildReportCard(
+                  'Relatório Financeiro',
+                  Icons.attach_money,
+                  () {},
+                ),
+                _buildReportCard(
+                  'Relatório de Atividades',
+                  Icons.timeline,
+                  () {},
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildReportCard(String title, IconData icon, VoidCallback onTap) {
-    return SizedBox(
-      width: 200,
-      height: 120,
+    return GestureDetector(
+      onTap: onTap,
       child: Card(
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 32, color: primaryColor),
-                SizedBox(height: 8),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
+        elevation: 2,
+        child: Container(
+          width: 200,
+          height: 120,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 40, color: primaryColor),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ],
           ),
         ),
       ),
     );
+  }
+  // Em _AdminDashboardState, substitua a função inteira
+
+  void _showCreateUserDialog() {
+    final formKey = GlobalKey<FormState>();
+    // Controladores para todos os campos possíveis
+    final firstNameController = TextEditingController();
+    final lastNameController = TextEditingController();
+    final cpfController = TextEditingController();
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final clinicaIdController = TextEditingController();
+    final crmController = TextEditingController();
+    final especialidadeController = TextEditingController();
+
+    UserRole selectedRole = UserRole.secretaria; // Valor padrão
+    bool isDialogLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Criar Novo Usuário'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: firstNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Primeiro Nome',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: lastNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Último Nome',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: cpfController,
+                        decoration: const InputDecoration(labelText: 'CPF'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: emailController,
+                        decoration: const InputDecoration(labelText: 'E-mail'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: passwordController,
+                        decoration: const InputDecoration(labelText: 'Senha'),
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<UserRole>(
+                        value: selectedRole,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo de Usuário',
+                        ),
+                        items: UserRole.values.map((role) {
+                          return DropdownMenuItem(
+                            value: role,
+                            child: Text(_getRoleConfig(role)['label']),
+                          );
+                        }).toList(),
+                        onChanged: (role) {
+                          if (role != null) {
+                            setDialogState(() => selectedRole = role);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // --- CAMPOS DINÂMICOS APARECEM AQUI ---
+
+                      // Campo de Clínica (aparece para Secretária e Médico)
+                      if (selectedRole == UserRole.secretaria ||
+                          selectedRole == UserRole.medico) ...[
+                        TextFormField(
+                          controller: clinicaIdController,
+                          decoration: const InputDecoration(
+                            labelText: 'ID da Clínica',
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+
+                        // Campos de Médico (aparecem apenas para Médico)
+                      ],
+                      if (selectedRole == UserRole.medico) ...[
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: crmController,
+                          decoration: const InputDecoration(labelText: 'CRM'),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: especialidadeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Especialidade',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          // A validação continua a mesma
+                          if (!(formKey.currentState?.validate() ?? false))
+                            return;
+
+                          setDialogState(() => isDialogLoading = true);
+
+                          try {
+                            final accessToken = await _storage.read(
+                              key: 'access_token',
+                            );
+                            if (accessToken == null)
+                              throw Exception('Token não encontrado');
+
+                            // --- MONTAGEM DINÂMICA DO JSON ---
+                            final Map<String, dynamic> userData = {
+                              "cpf": cpfController.text,
+                              "email": emailController.text,
+                              "first_name": firstNameController.text,
+                              "last_name": lastNameController.text,
+                              "password": passwordController.text,
+                              "user_type": selectedRole.name.toUpperCase(),
+                            };
+
+                            if (selectedRole == UserRole.secretaria ||
+                                selectedRole == UserRole.medico) {
+                              userData['clinica_id'] = int.tryParse(
+                                clinicaIdController.text,
+                              );
+                            }
+                            if (selectedRole == UserRole.medico) {
+                              userData['crm'] = crmController.text;
+                              userData['especialidade'] =
+                                  especialidadeController.text.toUpperCase();
+                            }
+
+                            final response = await _apiService.createClinicUser(
+                              userData,
+                              accessToken,
+                            );
+
+                            if (!mounted) return;
+                            if (response.statusCode == 201) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Usuário criado com sucesso!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _loadInitialData(); // Atualiza a lista de usuários
+                            } else {
+                              final error = (utf8.decode(response.bodyBytes),);
+                              throw Exception('Falha ao criar usuário: $error');
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted)
+                              setDialogState(() => isDialogLoading = false);
+                          }
+                        },
+                  child: isDialogLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+  // Em _AdminDashboardState
+
+  Future<void> _logout() async {
+    // 1. Apaga todos os dados salvos no armazenamento seguro
+    await _storage.deleteAll();
+
+    // 2. Navega para a tela de login e remove todas as telas anteriores da pilha
+    if (mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    }
+  }
+  // Em _AdminDashboardState
+
+  // SUBSTITUA a função _editUser (que você tinha no DataTable) por esta:
+  void _editUser(String userId) {
+    // Navega para a nova tela, passando o ID do usuário como argumento
+    Navigator.pushNamed(context, '/admin/edit-user', arguments: userId).then((
+      _,
+    ) {
+      // Esta função será chamada quando você VOLTAR da tela de edição.
+      // Recarregamos os dados para garantir que a lista esteja atualizada.
+      _loadInitialData();
+    });
   }
 }

@@ -56,3 +56,22 @@ class SolicitarReagendamentoAPIView(UpdateAPIView):
 
         serializer = self.get_serializer(consulta)
         return Response(serializer.data)
+    
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated
+from .models import Medico
+from .serializers import MedicoSerializer
+
+# ... (suas outras views, MedicoAgendaAPIView etc., continuam aqui) ...
+
+
+# 👇 ADICIONE ESTA NOVA VIEW 👇
+class MedicoListView(ListAPIView):
+    """
+    View para listar todos os médicos ativos.
+    Acessível apenas por usuários autenticados.
+    """
+    # Filtra para retornar apenas médicos com usuário ativo
+    queryset = Medico.objects.select_related('user').filter(user__is_active=True)
+    serializer_class = MedicoSerializer
+    permission_classes = [IsAuthenticated]

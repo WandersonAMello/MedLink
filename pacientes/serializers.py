@@ -4,54 +4,40 @@ from .models import Paciente
 from users.models import User
 from django.db import transaction
 
-class PacienteSerializer(serializers.ModelSerializer):
-    # Campos para receber dados que pertencem ao modelo User
-    username = serializers.CharField(write_only=True, required=True, source="user.first_name") # Mapeia para o nome
+class PacienteCreateSerializer(serializers.ModelSerializer):
+    # Pega os campos do User que virão no JSON do Flutter
+    cpf = serializers.CharField(write_only=True, required=True)
+    email = serializers.EmailField(write_only=True, required=True)
     password = serializers.CharField(write_only=True, required=True)
-    email = serializers.EmailField(required=True, source="user.email")
-    cpf = serializers.CharField(required=True, source="user.cpf")
+    first_name = serializers.CharField(write_only=True, required=True)
+    last_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Paciente
-        # 'user' não precisa estar nos fields se for a PK e for gerenciado internamente
-        fields = [
-            'email', 'password', 'username', 'cpf',
-            'telefone', 'data_cadastro'
-        ]
-        read_only_fields = ['data_cadastro']
+        # O serializer espera o 'telefone' do modelo Paciente. Os outros campos vêm do User.
+        fields = ['cpf', 'email', 'password', 'first_name', 'last_name', 'telefone']
+        # Adicione o 'data_nascimento' se o Flutter estiver enviando e seu modelo Paciente tiver esse campo
 
-    # O método transaction.atomic garante que ou os dois objetos (User e Paciente)
-    # são criados, ou nenhum deles é, mantendo a integridade do banco.
-    @transaction.atomic
+    @transaction.atomic # Garante que ou tudo é salvo, ou nada é salvo
     def create(self, validated_data):
-        # 1. Extrai os dados do usuário do dicionário validado
-        user_data = validated_data.pop('user')
-        password = validated_data.pop('password')
+        # 1. Separa os dados que são do User
+        user_data = {
+            'cpf': validated_data.pop('cpf'),
+            'email': validated_data.pop('email'),
+            'password': validated_data.pop('password'),
+            'first_name': validated_data.pop('first_name'),
+            'last_name': validated_data.pop('last_name', ''),
+            'user_type': 'PACIENTE' # Define o tipo de usuário como PACIENTE
+        }
         
-        # O username vem como 'first_name' devido ao 'source' no serializer
-        full_name = user_data.pop('first_name')
-        
-        # Divide o nome completo em nome e sobrenome
-        name_parts = full_name.split(' ', 1)
-        first_name = name_parts[0]
-        last_name = name_parts[1] if len(name_parts) > 1 else ''
+        # 2. Cria o User primeiro, usando o manager customizado
+        user = User.objects.create_user(**user_data)
 
-        # 2. Cria a instância do User
-        user = User.objects.create_user(
-            cpf=user_data['cpf'],
-            email=user_data['email'],
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-            user_type='PACIENTE' # Define o tipo de usuário
-        )
-
-        # 3. Cria a instância do Paciente, ligando-a ao User recém-criado
-        # validated_data agora contém apenas o campo 'telefone'
+        # 3. Cria o Paciente, vinculando o User recém-criado
+        # validated_data agora só contém os campos do Paciente (ex: 'telefone')
         paciente = Paciente.objects.create(user=user, **validated_data)
         
         return paciente
-
     def to_representation(self, instance):
         """Modifica a representação de saída para incluir dados do User."""
         representation = super().to_representation(instance)
@@ -61,3 +47,24 @@ class PacienteSerializer(serializers.ModelSerializer):
         representation['cpf'] = user.cpf
         representation['nome_completo'] = user.get_full_name()
         return representation
+    
+
+
+from rest_framework import serializers
+from .models import Paciente
+from users.models import User
+
+class UserForPatientSerializer(serializers.ModelSerializer):
+    nome_completo = serializers.CharField(source='get_full_name')
+
+    class Meta:
+        model = User
+        fields = ['id', 'nome_completo', 'email', 'cpf']
+
+
+class PacienteSerializer(serializers.ModelSerializer):
+    user = UserForPatientSerializer(read_only=True)
+
+    class Meta:
+        model = Paciente
+        fields = ['id', 'user', 'telefone']  # Adicione outros campos do Paciente conforme necessário

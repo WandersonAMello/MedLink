@@ -1,26 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
-// Model para consulta
-class Appointment {
-  final String id;
-  final String time;
-  final String patient;
-  final String doctor;
-  final String type;
-  AppointmentStatus status;
-
-  Appointment({
-    required this.id,
-    required this.time,
-    required this.patient,
-    required this.doctor,
-    required this.type,
-    required this.status,
-  });
-}
-
-enum AppointmentStatus { confirmed, pending, cancelled }
+import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
+import '../../models/appointment_model.dart';
+import '../../models/consulta_dashboard_model.dart';
+import '../../services/api_service.dart';
+import '../../models/dashboard_stats_model.dart';
+import 'package:medlink/models/appointment_model.dart';
+import 'package:medlink/models/patient_model.dart';
+import 'package:medlink/models/doctor_model.dart';
+import '../../models/patient_model.dart';
+import '../../models/doctor_model.dart';
 
 class SecretaryDashboard extends StatefulWidget {
   final VoidCallback? onLogout;
@@ -37,138 +28,125 @@ class SecretaryDashboard extends StatefulWidget {
 }
 
 class _SecretaryDashboardState extends State<SecretaryDashboard> {
-  bool _isNewAppointmentOpen = false;
-  String _cancelReason = '';
-  Appointment? _selectedAppointment;
+  // Estados da Tela
+  final ApiService _apiService = ApiService();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final TextEditingController _searchController = TextEditingController();
 
-  // Mock data - consultas do dia
-  final List<Appointment> _appointments = [
-    Appointment(
-      id: '1',
-      time: '09:00',
-      patient: 'Maria Silva',
-      doctor: 'Dr. João Santos',
-      type: 'Consulta Geral',
-      status: AppointmentStatus.confirmed,
-    ),
-    Appointment(
-      id: '2',
-      time: '10:30',
-      patient: 'Carlos Oliveira',
-      doctor: 'Dra. Ana Costa',
-      type: 'Retorno',
-      status: AppointmentStatus.pending,
-    ),
-    Appointment(
-      id: '3',
-      time: '14:00',
-      patient: 'Lucia Pereira',
-      doctor: 'Dr. Pedro Lima',
-      type: 'Primeira Consulta',
-      status: AppointmentStatus.confirmed,
-    ),
-    Appointment(
-      id: '4',
-      time: '15:30',
-      patient: 'Roberto Santos',
-      doctor: 'Dra. Maria Fernandes',
-      type: 'Exame',
-      status: AppointmentStatus.pending,
-    ),
-  ];
+  List<Appointment> _allAppointments = []; // Guarda a lista original da API
+  List<Appointment> _filteredAppointments = []; // Lista exibida na tela
+  List<Patient> _patients = [];
+  List<Doctor> _doctors = [];
+  DashboardStats? _stats;
+  bool _isLoading = true;
+  String _secretaryName = 'Secretária'; // Nome padrão
+  String _searchTerm = '';
 
-  // Cores do tema médico
+  // Constantes de Cor
   static const Color primaryColor = Color(0xFF0891B2);
   static const Color secondaryColor = Color(0xFF67E8F9);
   static const Color accentColor = Color(0xFFE0F2FE);
   static const Color backgroundColor = Color(0xFFF8FAFC);
 
-  // Configurações de status
-  Map<String, dynamic> _getStatusConfig(AppointmentStatus status) {
-    switch (status) {
-      case AppointmentStatus.confirmed:
-        return {'label': 'Confirmada', 'color': Colors.green};
-      case AppointmentStatus.pending:
-        return {'label': 'Pendente', 'color': Colors.orange};
-      case AppointmentStatus.cancelled:
-        return {'label': 'Cancelada', 'color': Colors.red};
-    }
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+    _searchController.addListener(() {
+      setState(() {
+        _searchTerm = _searchController.text;
+        _filterAppointments();
+      });
+    });
   }
 
-  // Estatísticas
-  Map<String, int> get _stats {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // Em _SecretaryDashboardState
+  Map<String, int> get _summaryStats {
     return {
-      'today': _appointments.length,
-      'confirmed': _appointments
-          .where((a) => a.status == AppointmentStatus.confirmed)
+      'today': _allAppointments
+          .where((a) => a.dateTime.day == DateTime.now().day)
           .length,
-      'pending': _appointments
-          .where((a) => a.status == AppointmentStatus.pending)
+      'confirmed': _allAppointments
+          .where((a) => a.status == 'confirmed')
           .length,
-      'totalMonth': 127, // Mock data
+      'pending': _allAppointments.where((a) => a.status == 'pending').length,
+      'totalMonth': _allAppointments
+          .where(
+            (a) =>
+                a.dateTime.month == DateTime.now().month &&
+                a.dateTime.year == DateTime.now().year,
+          )
+          .length,
     };
   }
 
-  // Confirmar consulta
-  void _confirmAppointment(String appointmentId) {
-    setState(() {
-      final index = _appointments.indexWhere((a) => a.id == appointmentId);
-      if (index != -1) {
-        _appointments[index].status = AppointmentStatus.confirmed;
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoading = true);
+    try {
+      final accessToken = await _storage.read(key: 'access_token');
+      if (accessToken == null) {
+        throw Exception('Token não encontrado. Faça o login novamente.');
       }
-    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Consulta confirmada com sucesso!'),
-        backgroundColor: primaryColor,
-      ),
-    );
-  }
+      // Decodifica o token para pegar o nome do usuário
+      Map<String, dynamic> decodedToken = JwtDecoder.decode(accessToken);
 
-  // Mostrar dialog de cancelamento
-  void _showCancelDialog(Appointment appointment) {
-    setState(() {
-      _selectedAppointment = appointment;
-      _cancelReason = '';
-    });
+      // Busca os dados da API em paralelo
+      final results = await Future.wait([
+        _apiService.getDashboardStats(accessToken),
+        _apiService.getAppointments(accessToken),
+        _apiService.getPatients(accessToken),
+        _apiService.getDoctors(accessToken),
+      ]);
 
-    showDialog(context: context, builder: (context) => _buildCancelDialog());
-  }
-
-  // Cancelar consulta
-  void _cancelAppointment() {
-    if (_selectedAppointment != null) {
+      if (!mounted) return;
       setState(() {
-        final index = _appointments.indexWhere(
-          (a) => a.id == _selectedAppointment!.id,
-        );
-        if (index != -1) {
-          _appointments[index].status = AppointmentStatus.cancelled;
-        }
+        _secretaryName = decodedToken['full_name'] ?? 'Secretária';
+        _stats = results[0] as DashboardStats;
+        _allAppointments = results[1] as List<Appointment>;
+        _filteredAppointments = _allAppointments;
+        _patients = results[2] as List<Patient>;
+        _doctors = results[3] as List<Doctor>;
       });
-
-      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Consulta cancelada com sucesso!'),
-          backgroundColor: primaryColor,
+          content: Text('Erro ao carregar dados: $e'),
+          backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  // Editar consulta
-  void _editAppointment(String appointmentId) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Funcionalidade de edição em desenvolvimento'),
-        backgroundColor: Colors.blue,
-      ),
-    );
+  void _filterAppointments() {
+    if (_searchTerm.isEmpty) {
+      _filteredAppointments = _allAppointments;
+    } else {
+      _filteredAppointments = _allAppointments.where((appointment) {
+        final searchTermLower = _searchTerm.toLowerCase();
+        final patientNameLower = appointment.patientName.toLowerCase();
+        final doctorNameLower = appointment.doctorName.toLowerCase();
+        return patientNameLower.contains(searchTermLower) ||
+            doctorNameLower.contains(searchTermLower);
+      }).toList();
+    }
+    setState(() {});
   }
 
-  // Formatar data de hoje
+  // ... (Suas funções _confirmAppointment, _cancelAppointment, _editAppointment, etc., viriam aqui)
+  // ... (Elas devem chamar a API e, no final, chamar _loadInitialData() para atualizar a tela)
+
   String get _todayFormatted {
     final now = DateTime.now();
     return DateFormat('EEEE, d \'de\' MMMM \'de\' y', 'pt_BR').format(now);
@@ -192,19 +170,19 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
               children: [
                 _buildHeader(),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
                 _buildStatsCards(),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
                 Expanded(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(flex: 2, child: _buildTodaySchedule()),
-                      SizedBox(width: 16),
+                      Expanded(flex: 3, child: _buildTodaySchedule()),
+                      const SizedBox(width: 24),
                       Expanded(flex: 1, child: _buildQuickActions()),
                     ],
                   ),
@@ -217,12 +195,11 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     );
   }
 
-  // Header
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
+        const Row(
           children: [
             Icon(Icons.local_hospital, size: 32, color: primaryColor),
             SizedBox(width: 12),
@@ -239,7 +216,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                 ),
                 Text(
                   'Painel da Secretária',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(color: Colors.grey),
                 ),
               ],
             ),
@@ -250,21 +227,22 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // NOME REAL DA SECRETÁRIA
                 Text(
-                  'Bem-vindo, Ana Silva',
-                  style: TextStyle(fontWeight: FontWeight.w500),
+                  'Bem-vinda, $_secretaryName',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
-                Text(
+                const Text(
                   'Secretária',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             OutlinedButton.icon(
-              onPressed: widget.onLogout,
-              icon: Icon(Icons.logout, size: 16),
-              label: Text('Sair'),
+              onPressed: _logout,
+              icon: const Icon(Icons.logout, size: 16),
+              label: const Text('Sair'),
             ),
           ],
         ),
@@ -272,41 +250,46 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     );
   }
 
-  // Cards de estatísticas
   Widget _buildStatsCards() {
+    if (_isLoading || _stats == null) {
+      return const SizedBox(
+        height: 80,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Row(
       children: [
         Expanded(
           child: _buildStatCard(
             'Hoje',
-            _stats['today']!,
+            _stats!.today,
             Icons.calendar_today,
             primaryColor,
           ),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           child: _buildStatCard(
             'Confirmadas',
-            _stats['confirmed']!,
+            _stats!.confirmed,
             Icons.check_circle,
             Colors.green,
           ),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           child: _buildStatCard(
             'Pendentes',
-            _stats['pending']!,
+            _stats!.pending,
             Icons.access_time,
             Colors.orange,
           ),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           child: _buildStatCard(
             'Total Mês',
-            _stats['totalMonth']!,
+            _stats!.totalMonth,
             Icons.local_hospital,
             primaryColor,
           ),
@@ -319,7 +302,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             Container(
@@ -331,7 +314,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
               ),
               child: Icon(icon, color: color, size: 20),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,7 +325,10 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                   ),
                   Text(
                     value.toString(),
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -353,22 +339,20 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     );
   }
 
-  // Agenda do dia
   Widget _buildTodaySchedule() {
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header da agenda
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       children: [
                         Icon(Icons.calendar_today, color: primaryColor),
                         SizedBox(width: 8),
@@ -381,34 +365,45 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       _todayFormatted,
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => _showNewAppointmentDialog(),
-                  icon: Icon(Icons.add),
-                  label: Text('Nova Consulta'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
+                // BARRA DE PESQUISA
+                SizedBox(
+                  width: 250,
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar paciente ou médico...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 16),
-
-            // Lista de consultas
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
             Expanded(
-              child: ListView.builder(
-                itemCount: _appointments.length,
-                itemBuilder: (context, index) {
-                  final appointment = _appointments[index];
-                  return _buildAppointmentCard(appointment);
-                },
-              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredAppointments.isEmpty
+                  ? const Center(child: Text("Nenhum agendamento encontrado."))
+                  : ListView.builder(
+                      itemCount: _filteredAppointments.length,
+                      itemBuilder: (context, index) {
+                        final appointment = _filteredAppointments[index];
+                        return _buildAppointmentCard(appointment);
+                      },
+                    ),
             ),
           ],
         ),
@@ -416,44 +411,46 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     );
   }
 
-  // Card de consulta
+  // Em _SecretaryDashboardState
   Widget _buildAppointmentCard(Appointment appointment) {
-    final statusConfig = _getStatusConfig(appointment.status);
-
+    final statusColor = appointment.status == 'confirmed'
+        ? Colors.green
+        : Colors.orange;
     return Container(
-      margin: EdgeInsets.only(bottom: 12),
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.white,
-      ),
+      margin: const EdgeInsets.only(bottom: 12),
+      // ... (o resto do seu Container)
       child: Row(
         children: [
-          // Horário
           Column(
             children: [
-              Icon(Icons.access_time, color: primaryColor, size: 16),
-              SizedBox(height: 4),
+              const Icon(Icons.access_time, color: primaryColor, size: 16),
+              const SizedBox(height: 4),
+              // CORRIGIDO: Usa o novo campo `dateTime`
               Text(
-                appointment.time,
-                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+                DateFormat.Hm().format(appointment.dateTime),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
-          SizedBox(width: 16),
-
-          // Informações da consulta
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // CORRIGIDO: Usa o novo campo `patientName`
                 Text(
-                  appointment.patient,
-                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                  appointment.patientName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
                 ),
+                // CORRIGIDO: Usa o novo campo `doctorName`
                 Text(
-                  appointment.doctor,
+                  appointment.doctorName,
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 Text(
@@ -463,129 +460,38 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
               ],
             ),
           ),
-
-          // Ações e status
-          Column(
-            children: [
-              // Botões de ação
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (appointment.status == AppointmentStatus.pending)
-                    Container(
-                      width: 32,
-                      height: 32,
-                      margin: EdgeInsets.only(right: 4),
-                      child: IconButton(
-                        onPressed: () => _confirmAppointment(appointment.id),
-                        icon: Icon(Icons.check, size: 16, color: Colors.green),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.green[50],
-                          side: BorderSide(color: Colors.green[200]!),
-                        ),
-                      ),
-                    ),
-                  if (appointment.status != AppointmentStatus.cancelled)
-                    Container(
-                      width: 32,
-                      height: 32,
-                      margin: EdgeInsets.only(right: 4),
-                      child: IconButton(
-                        onPressed: () => _showCancelDialog(appointment),
-                        icon: Icon(Icons.close, size: 16, color: Colors.red),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.red[50],
-                          side: BorderSide(color: Colors.red[200]!),
-                        ),
-                      ),
-                    ),
-                  Container(
-                    width: 32,
-                    height: 32,
-                    child: IconButton(
-                      onPressed: () => _editAppointment(appointment.id),
-                      icon: Icon(Icons.edit, size: 16, color: Colors.blue),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.blue[50],
-                        side: BorderSide(color: Colors.blue[200]!),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-
-              // Badge de status
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusConfig['color'].withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  statusConfig['label'],
-                  style: TextStyle(
-                    color: statusConfig['color'],
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          // ... (o resto do seu card com os botões e o badge de status)
         ],
       ),
     );
   }
 
-  // Ações rápidas
   Widget _buildQuickActions() {
+    // Este widget continua o mesmo
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Ações Rápidas',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 16),
-
+            const SizedBox(height: 16),
             _buildActionButton(
               'Nova Consulta',
               Icons.add,
               primaryColor,
-              () => _showNewAppointmentDialog(),
+              _showNewAppointmentDialog,
               isPrimary: true,
             ),
-            SizedBox(height: 12),
-
+            const SizedBox(height: 12),
             _buildActionButton(
               'Novo Paciente',
               Icons.person_add,
               Colors.grey[700]!,
-              widget.onNavigateToNewPatient ?? () {},
-            ),
-            SizedBox(height: 12),
-
-            _buildActionButton(
-              'Ver Agenda Completa',
-              Icons.calendar_view_day,
-              Colors.grey[700]!,
-              () {
-                // Implementar navegação para agenda completa
-              },
-            ),
-            SizedBox(height: 12),
-
-            _buildActionButton(
-              'Lista de Pacientes',
-              Icons.people,
-              Colors.grey[700]!,
-              () {
-                // Implementar navegação para lista de pacientes
-              },
+              _showNewPatientDialog,
             ),
           ],
         ),
@@ -600,6 +506,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     VoidCallback onPressed, {
     bool isPrimary = false,
   }) {
+    // Este widget continua o mesmo
     return SizedBox(
       width: double.infinity,
       height: 48,
@@ -617,70 +524,413 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     );
   }
 
-  // Dialog de cancelamento
-  Widget _buildCancelDialog() {
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.warning, color: Colors.orange),
-          SizedBox(width: 8),
-          Text('Cancelar Consulta'),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Você tem certeza que deseja cancelar esta consulta? Esta ação não pode ser desfeita.',
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Motivo do cancelamento (opcional)',
-            style: TextStyle(fontWeight: FontWeight.w500),
-          ),
-          SizedBox(height: 8),
-          TextField(
-            onChanged: (value) => _cancelReason = value,
-            maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Descreva o motivo do cancelamento...',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancelar'),
-        ),
-        ElevatedButton(
-          onPressed: _cancelAppointment,
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          child: Text(
-            'Confirmar Cancelamento',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      ],
+  // Em _SecretaryDashboardState
+
+  void _showNewAppointmentDialog() {
+    Patient? selectedPatient;
+    Doctor? selectedDoctor;
+    DateTime? selectedDate;
+    TimeOfDay? selectedTime;
+    final valorController = TextEditingController();
+    final typeController = TextEditingController();
+    bool isDialogLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Novo Agendamento'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<Patient>(
+                      hint: const Text('Selecione o Paciente'),
+                      value: selectedPatient,
+                      items: _patients.map((patient) {
+                        return DropdownMenuItem(
+                          value: patient,
+                          child: Text(
+                            patient.fullName,
+                          ), // <-- Corrigido para fullName
+                        );
+                      }).toList(),
+                      onChanged: (value) =>
+                          setDialogState(() => selectedPatient = value),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<Doctor>(
+                      hint: const Text('Selecione o Médico'),
+                      value: selectedDoctor,
+                      items: _doctors
+                          .map(
+                            (doctor) => DropdownMenuItem(
+                              value: doctor,
+                              child: Text(doctor.fullName),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setDialogState(() => selectedDoctor = value),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: typeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo de Consulta',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: valorController,
+                      decoration: const InputDecoration(labelText: 'Valor'),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.calendar_today),
+                            label: Text(
+                              selectedDate == null
+                                  ? 'Data'
+                                  : DateFormat(
+                                      'dd/MM/yyyy',
+                                    ).format(selectedDate!),
+                            ),
+                            onPressed: () async {
+                              final date = await showDatePicker(
+                                context: context,
+                                initialDate: DateTime.now(),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365),
+                                ),
+                              );
+                              if (date != null)
+                                setDialogState(() => selectedDate = date);
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.access_time),
+                            label: Text(
+                              selectedTime == null
+                                  ? 'Hora'
+                                  : selectedTime!.format(context),
+                            ),
+                            onPressed: () async {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.now(),
+                              );
+                              if (time != null)
+                                setDialogState(() => selectedTime = time);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          if (selectedPatient == null ||
+                              selectedDoctor == null ||
+                              selectedDate == null ||
+                              selectedTime == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Preencha todos os campos'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          setDialogState(() => isDialogLoading = true);
+                          try {
+                            final accessToken = await _storage.read(
+                              key: 'access_token',
+                            );
+                            if (accessToken == null)
+                              throw Exception('Token não encontrado');
+
+                            final appointmentDateTime = DateTime(
+                              selectedDate!.year,
+                              selectedDate!.month,
+                              selectedDate!.day,
+                              selectedTime!.hour,
+                              selectedTime!.minute,
+                            );
+                            final newAppointment = Appointment(
+                              id: 0, // O ID é gerado pelo backend
+                              dateTime: appointmentDateTime,
+                              status: 'PENDENTE',
+                              valor:
+                                  double.tryParse(valorController.text) ?? 0.0,
+                              patientName: '',
+                              doctorName: '',
+                              type: typeController.text,
+                              patientId: selectedPatient!.id,
+                              doctorId: selectedDoctor!.id,
+                              clinicId: 1, // TODO: Pegar o ID da clínica logada
+                            );
+
+                            final response = await _apiService
+                                .createAppointment(newAppointment, accessToken);
+
+                            if (!mounted) return;
+                            if (response.statusCode == 201) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Agendamento criado com sucesso!',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _fetchAppointments(); // Atualiza a lista
+                            } else {
+                              throw Exception(
+                                'Falha ao criar agendamento: ${response.body}',
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted)
+                              setDialogState(() => isDialogLoading = false);
+                          }
+                        },
+                  child: isDialogLoading
+                      ? const CircularProgressIndicator()
+                      : const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
-  // Dialog de nova consulta (placeholder)
-  void _showNewAppointmentDialog() {
+  // As funções de confirmar e cancelar (_confirmAppointment, _cancelAppointment, etc.) continuam as mesmas
+
+  // Em _SecretaryDashboardState
+
+  Future<void> _fetchAppointments() async {
+    // Renomeado para refletir que busca tudo
+    setState(() => _isLoading = true);
+    try {
+      final accessToken = await _storage.read(key: 'access_token');
+      if (accessToken == null) throw Exception('Token não encontrado');
+
+      // Busca todos os dados necessários em paralelo
+      final results = await Future.wait([
+        _apiService.getAppointments(accessToken),
+        _apiService.getPatients(accessToken),
+        _apiService.getDoctors(accessToken),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _allAppointments = results[0] as List<Appointment>;
+        _filterAppointments(); // Aplica o filtro após atualizar a lista completa
+        _patients = results[1] as List<Patient>;
+        _doctors = results[2] as List<Doctor>;
+      });
+    } catch (e) {
+      // ... (seu tratamento de erro)
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+  // Em _SecretaryDashboardState
+
+  Future<void> _logout() async {
+    // 1. Apaga todos os tokens salvos no armazenamento seguro.
+    // É uma boa prática limpar tudo para garantir que nenhum dado antigo permaneça.
+    await _storage.deleteAll();
+
+    // 2. Navega para a tela de login ('/') e remove todas as telas anteriores da pilha.
+    // Isso impede que o usuário aperte "voltar" e retorne ao dashboard.
+    if (mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    }
+  }
+  // Em _SecretaryDashboardState
+
+  void _navigateToNewPatient() {
+    // Navega para a nova tela, passando o ID do usuário como argumento
+    Navigator.pushNamed(context, '/new-patient').then((_) {
+      // Esta função será chamada quando você VOLTAR da tela de cadastro.
+      // Recarregamos os dados para garantir que as listas de pacientes e
+      // agendamentos estejam atualizadas.
+      print("Voltando da tela de cadastro de paciente, atualizando dados...");
+      _loadInitialData();
+    });
+  }
+
+  // Em _SecretaryDashboardState
+
+  void _showNewPatientDialog() {
+    final formKey = GlobalKey<FormState>();
+    final nomeController = TextEditingController();
+    final cpfController = TextEditingController();
+    final emailController = TextEditingController();
+    final telefoneController = TextEditingController();
+    // Para pacientes, não precisamos de senha no formulário da secretária
+    // O backend pode gerar uma senha inicial ou um link para definição de senha.
+
+    bool isDialogLoading = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Nova Consulta'),
-        content: Text('Modal de nova consulta será implementado aqui.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Fechar'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Cadastrar Novo Paciente'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: nomeController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome Completo',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: cpfController,
+                        decoration: const InputDecoration(labelText: 'CPF'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: emailController,
+                        decoration: const InputDecoration(labelText: 'E-mail'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: telefoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Telefone',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          if (!(formKey.currentState?.validate() ?? false))
+                            return;
+
+                          setDialogState(() => isDialogLoading = true);
+
+                          try {
+                            final accessToken = await _storage.read(
+                              key: 'access_token',
+                            );
+                            if (accessToken == null)
+                              throw Exception('Token não encontrado');
+
+                            // Monta o JSON para criar um usuário do tipo PACIENTE
+                            final userData = {
+                              "nome_completo": nomeController.text,
+                              "cpf": cpfController.text,
+                              "email": emailController.text,
+                              "telefone": telefoneController.text,
+                              "user_type": "PACIENTE",
+                              // A API do backend deve ser responsável por gerar uma senha padrão
+                              // ou enviar um link de redefinição de senha para o novo paciente.
+                            };
+
+                            // Reutilizamos o método createClinicUser, pois ele cria qualquer tipo de usuário
+                            // TODO: Talvez renomear para `createUser` no ApiService para ficar mais genérico
+                            final response = await _apiService.createPatient(
+                              userData,
+                              accessToken,
+                            );
+
+                            if (!mounted) return;
+                            if (response.statusCode == 201) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Paciente criado com sucesso!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _loadInitialData(); // Atualiza a lista de pacientes para o dropdown
+                            } else {
+                              final error = jsonDecode(
+                                utf8.decode(response.bodyBytes),
+                              );
+                              throw Exception(
+                                'Falha ao criar paciente: $error',
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted)
+                              setDialogState(() => isDialogLoading = false);
+                          }
+                        },
+                  child: isDialogLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
