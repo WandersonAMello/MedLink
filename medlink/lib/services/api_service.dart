@@ -1,53 +1,135 @@
-// lib/services/api_service.dart
-
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
 import 'package:medlink/views/pages/admin.dart';
 import '../models/user_model.dart';
 import '../models/appointment_model.dart';
 import '../models/dashboard_stats_model.dart';
 import '../models/patient_model.dart';
 import '../models/doctor_model.dart';
+import '../models/paciente.dart';
 
 class ApiService {
+  // ✅ Base URL unificada
   final String baseUrl = kIsWeb
-      ? "http://127.0.0.1:8000/api"
-      : "http://10.0.2.2:8000/api";
+      ? "http://127.0.0.1:8000"
+      : "http://10.0.2.2:8000";
 
-  Future<http.Response> login(String cpf, String password) async {
-    final url = Uri.parse(
-      "${kIsWeb ? 'http://127.0.0.1:8000' : 'http://10.0.2.2:8000'}/api/token/",
-    );
-    return await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"cpf": cpf, "password": password}),
-    );
-  }
+  static String? _accessToken;
 
-  Future<bool> register(User user) async {
-    final response = await http.post(
-      Uri.parse("$baseUrl/api/pacientes/register/"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode(user.toJson()),
-    );
+  Future<Map<String, dynamic>?> login(String cpf, String password) async {
+    final url = Uri.parse("$baseUrl/api/token/");
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"cpf": cpf, "password": password}),
+      );
 
-    if (response.statusCode == 201) {
-      return true;
-    } else {
-      return false;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _accessToken = data['access'];
+        final String? userType = _getUserTypeFromToken(_accessToken!);
+
+        return {
+          'success': true,
+          'access_token': data['access'],
+          'refresh_token': data['refresh'],
+          'user_type': userType ?? 'unknown',
+        };
+      } else {
+        return {
+          'success': false,
+          'status_code': response.statusCode,
+          'body': response.body,
+        };
+      }
+    } catch (e) {
+      print('Erro na chamada de login: $e');
+      return {'success': false, 'error': e.toString()};
     }
   }
 
+  // ✅ Helper para extrair o tipo de usuário do token JWT
+  String? _getUserTypeFromToken(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) throw Exception('Token JWT inválido');
+      final payload = parts[1];
+      final normalized = base64Url.normalize(payload);
+      final resp = utf8.decode(base64Url.decode(normalized));
+      final payloadMap = json.decode(resp);
+      return payloadMap['user_type'];
+    } catch (e) {
+      print('Erro ao decodificar token: $e');
+      return null;
+    }
+  }
+
+  // ✅ REGISTRO DE PACIENTE
+  Future<bool> register(User user) async {
+    // separa o nome completo
+    final parts = user.username.split(' ');
+    final firstName = parts.isNotEmpty ? parts.first : user.username;
+    final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+
+    final response = await http.post(
+      Uri.parse("$baseUrl/api/pacientes/register/"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "cpf": user.cpf,
+        "email": user.email,
+        "password": user.password,
+        "first_name": firstName,
+        "last_name": lastName,
+        "telefone": user.telefone,
+      }),
+    );
+
+    print("Status: ${response.statusCode}");
+    print("Body: ${response.body}");
+
+    return response.statusCode == 201;
+  }
+
+  // ✅ PACIENTES DO DIA
+  Future<List<Paciente>> getPacientesDoDia() async {
+    final url = Uri.parse("$baseUrl/api/pacientes/hoje/");
+
+    if (_accessToken == null) {
+      throw Exception(
+        'Token de acesso não encontrado. Faça o login novamente.',
+      );
+    }
+
+    final response = await http.get(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $_accessToken",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      List<dynamic> body = jsonDecode(utf8.decode(response.bodyBytes));
+      return body.map((e) => Paciente.fromJson(e)).toList();
+    } else {
+      throw Exception(
+        'Falha ao carregar pacientes do dia: ${response.statusCode}',
+      );
+    }
+  }
+
+  // ✅ DASHBOARD STATS
   Future<DashboardStats> getDashboardStats(String accessToken) async {
-    final url = Uri.parse("$baseUrl/secretarias/dashboard/stats/");
+    final url = Uri.parse("$baseUrl/api/secretarias/dashboard/stats/");
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $accessToken'},
     );
+
     if (response.statusCode == 200) {
-      // Se a resposta estiver vazia, retorna um objeto de Stats zerado
       if (response.body.isEmpty || response.body == "{}") {
         return DashboardStats(
           today: 0,
@@ -64,18 +146,16 @@ class ApiService {
     }
   }
 
+  // ✅ CONSULTAS / AGENDAMENTOS
   Future<List<Appointment>> getAppointments(String accessToken) async {
-    final url = Uri.parse("$baseUrl/secretarias/dashboard/consultas-hoje/");
+    final url = Uri.parse("$baseUrl/api/secretarias/dashboard/consultas-hoje/");
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $accessToken'},
     );
 
     if (response.statusCode == 200) {
-      // Se a resposta estiver vazia, retorna uma lista vazia em vez de dar erro
-      if (response.body == "[]" || response.body.isEmpty) {
-        return [];
-      }
+      if (response.body.isEmpty || response.body == "[]") return [];
       final List<dynamic> jsonList = json.decode(
         utf8.decode(response.bodyBytes),
       );
@@ -91,26 +171,22 @@ class ApiService {
     Appointment appointment,
     String accessToken,
   ) async {
-    final url = Uri.parse("$baseUrl/agendamentos/");
+    final url = Uri.parse("$baseUrl/api/agendamentos/");
     return await http.post(
       url,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-      body: jsonEncode(
-        appointment.toJson(),
-      ), // Usa o método toJson do novo modelo
+      body: jsonEncode(appointment.toJson()),
     );
   }
 
-  /// Envia uma requisição para confirmar uma consulta específica.
-  /// O backend espera o status atualizado no corpo da requisição.
   Future<http.Response> confirmAppointment(
     int appointmentId,
     String accessToken,
   ) async {
-    final url = Uri.parse("$baseUrl/consultas/$appointmentId/confirmar/");
+    final url = Uri.parse("$baseUrl/api/consultas/$appointmentId/confirmar/");
     return await http.patch(
       url,
       headers: {
@@ -121,14 +197,13 @@ class ApiService {
     );
   }
 
-  /// Envia uma requisição para confirmar uma consulta específica.
-  /// O backend espera o status atualizado no corpo da requisição.
-  /// Este método aceita um objeto Appointment em vez de apenas o ID.
   Future<http.Response> confirmAppointmentByObject(
     Appointment appointment,
     String accessToken,
   ) async {
-    final url = Uri.parse("$baseUrl/consultas/${appointment.id}/confirmar/");
+    final url = Uri.parse(
+      "$baseUrl/api/consultas/${appointment.id}/confirmar/",
+    );
     return await http.patch(
       url,
       headers: {
@@ -139,11 +214,10 @@ class ApiService {
     );
   }
 
-  // --- MÉTODOS DO ADMIN ---
-
+  // ✅ ADMIN (Usuários da Clínica)
   Future<List<AdminUser>> getClinicUsers(String accessToken) async {
-    // 👇 CORREÇÃO: O caminho agora é relativo à baseUrl
-    final url = Uri.parse("$baseUrl/admin/users/");
+    // 👇 CORREÇÃO: O caminho completo /api/admin/users/ é construído aqui
+    final url = Uri.parse("$baseUrl/api/admin/users/");
 
     final response = await http.get(
       url,
@@ -167,7 +241,7 @@ class ApiService {
     bool isActive,
     String accessToken,
   ) async {
-    final url = Uri.parse("$baseUrl/admin/users/$userId/");
+    final url = Uri.parse("$baseUrl/api/admin/users/$userId/");
     return await http.patch(
       url,
       headers: {
@@ -179,23 +253,18 @@ class ApiService {
   }
 
   Future<http.Response> deleteUser(String userId, String accessToken) async {
-    final url = Uri.parse("$baseUrl/admin/users/$userId/");
+    final url = Uri.parse("$baseUrl/api/admin/users/$userId/");
     return await http.delete(
       url,
       headers: {'Authorization': 'Bearer $accessToken'},
     );
   }
 
-  // Em lib/services/api_service.dart
-
-  // ... (seus métodos existentes: getClinicUsers, etc.)
-
-  /// Cria um novo usuário da clínica (Secretária, Médico, etc.).
   Future<http.Response> createClinicUser(
     Map<String, dynamic> userData,
     String accessToken,
   ) async {
-    final url = Uri.parse("$baseUrl/admin/users/");
+    final url = Uri.parse("$baseUrl/api/admin/users/");
     return await http.post(
       url,
       headers: {
@@ -205,25 +274,21 @@ class ApiService {
       body: jsonEncode(userData),
     );
   }
-  // --- NOVOS MÉTODOS PARA A TELA DE EDIÇÃO ---
 
-  /// Busca os detalhes de um único usuário pelo seu ID.
   Future<AdminUser> getSingleUser(String userId, String accessToken) async {
-    final url = Uri.parse("$baseUrl/admin/users/$userId/");
+    final url = Uri.parse("$baseUrl/api/admin/users/$userId/");
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $accessToken'},
     );
 
     if (response.statusCode == 200) {
-      // Usa o AdminUser.fromJson que já criamos para "traduzir" a resposta
       return AdminUser.fromJson(json.decode(utf8.decode(response.bodyBytes)));
     } else {
       throw Exception('Falha ao carregar dados do usuário.');
     }
   }
 
-  /// Atualiza os dados de um usuário (PATCH para atualização parcial).
   Future<http.Response> updateUser(
     String userId,
     Map<String, dynamic> data,
@@ -239,17 +304,17 @@ class ApiService {
       body: jsonEncode(data),
     );
   }
-  // --- NOVOS MÉTODOS CORRIGIDOS ---
 
+  // ✅ PACIENTES e MÉDICOS
   Future<List<Patient>> getPatients(String accessToken) async {
-    // 👇 CORREÇÃO: Caminho sem o /api duplicado
-    final url = Uri.parse("$baseUrl/pacientes/");
+    final url = Uri.parse("$baseUrl/api/pacientes/");
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $accessToken'},
     );
+
     if (response.statusCode == 200) {
-      if (response.body == "[]" || response.body.isEmpty) return [];
+      if (response.body.isEmpty || response.body == "[]") return [];
       final List<dynamic> jsonList = json.decode(
         utf8.decode(response.bodyBytes),
       );
@@ -262,14 +327,14 @@ class ApiService {
   }
 
   Future<List<Doctor>> getDoctors(String accessToken) async {
-    // 👇 CORREÇÃO: Caminho sem o /api duplicado
-    final url = Uri.parse("$baseUrl/medicos/");
+    final url = Uri.parse("$baseUrl/api/medicos/");
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer $accessToken'},
     );
+
     if (response.statusCode == 200) {
-      if (response.body == "[]" || response.body.isEmpty) return [];
+      if (response.body.isEmpty || response.body == "[]") return [];
       final List<dynamic> jsonList = json.decode(
         utf8.decode(response.bodyBytes),
       );
@@ -285,9 +350,7 @@ class ApiService {
     Map<String, dynamic> patientData,
     String accessToken,
   ) async {
-    // A URL correta para o cadastro de pacientes, como definido pela sua equipe
-    final url = Uri.parse("$baseUrl/pacientes/register/");
-
+    final url = Uri.parse("$baseUrl/api/pacientes/register/");
     return await http.post(
       url,
       headers: {

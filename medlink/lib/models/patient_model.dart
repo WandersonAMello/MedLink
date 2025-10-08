@@ -10,7 +10,7 @@ class Patient {
     final userJson = json['user'] as Map<String, dynamic>? ?? json;
     return Patient(
       id: userJson['id'],
-      fullName: userJson['full_name'] ?? 'Nome não informado',
+      fullName: userJson['nome_completo'] ?? 'Nome não informado',
     );
   }
 }

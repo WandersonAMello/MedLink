@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:convert'; // Import para o jsonDecode
-import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // Import do Secure Storage
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../controllers/login_controller.dart';
 
 class LoginPage extends StatefulWidget {
@@ -15,10 +14,10 @@ class _LoginPageState extends State<LoginPage> {
   final _senhaController = TextEditingController();
   final LoginController _loginController = LoginController();
 
-  // 1. Variável para controlar o estado de carregamento
+  bool _obscurePassword = true;
   bool _isLoading = false;
 
-  // 2. LÓGICA DE LOGIN ATUALIZADA
+  // ---- Lógica de login atualizada ----
   void _onLoginPressed() async {
     final cpf = _cpfController.text;
     final senha = _senhaController.text;
@@ -32,23 +31,19 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    // Ativa o loading na UI
     setState(() => _isLoading = true);
 
-    // Chama o controller, que agora retorna um mapa com os dados ou nulo
     final loginData = await _loginController.login(cpf, senha);
 
-    // Desativa o loading na UI
     setState(() => _isLoading = false);
 
     if (!mounted) return;
 
     if (loginData != null) {
-      // Sucesso! Pega os dados do mapa
       final accessToken = loginData['access_token'];
       final userType = loginData['user_type'];
 
-      // Salva o token de forma segura
+      // Salva o token com segurança
       const storage = FlutterSecureStorage();
       await storage.write(key: 'access_token', value: accessToken);
 
@@ -56,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
         const SnackBar(content: Text("Login realizado com sucesso!")),
       );
 
-      // 3. LÓGICA DE REDIRECIONAMENTO
+      // Redirecionamento conforme tipo de usuário
       switch (userType) {
         case 'SECRETARIA':
           Navigator.pushReplacementNamed(context, '/secretary/dashboard');
@@ -67,21 +62,20 @@ class _LoginPageState extends State<LoginPage> {
         case 'ADMIN':
           Navigator.pushReplacementNamed(context, '/admin/dashboard');
           break;
-        // Adicione outros casos aqui (ex: 'PACIENTE', 'FINANCEIRO')
+        case 'PACIENTE':
+          Navigator.pushReplacementNamed(context, '/user/dashboard');
+          break;
         default:
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Tipo de usuário desconhecido!")),
           );
       }
     } else {
-      // Falha no login (senha errada, usuário não existe ou erro de conexão)
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Usuário ou senha incorretos")),
       );
     }
   }
-
-  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +96,6 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Logo
                     SizedBox(
                       height: 80,
                       child: Image.asset(
@@ -114,8 +107,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // Título
                     const Text(
                       "Realizar Login",
                       textAlign: TextAlign.center,
@@ -125,8 +116,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    // CPF
                     const Text("CPF:"),
                     const SizedBox(height: 8),
                     TextField(
@@ -136,9 +125,6 @@ class _LoginPageState extends State<LoginPage> {
                         prefixIcon: const Icon(Icons.badge),
                         hintText: "000.000.000-00",
                         border: OutlineInputBorder(
-                          borderSide: const BorderSide(
-                            color: Color(0xFF5BBCDC),
-                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         focusedBorder: OutlineInputBorder(
@@ -148,17 +134,9 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(
-                            color: Color(0xFF5BBCDC),
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // Senha
                     const Text("Senha:"),
                     const SizedBox(height: 8),
                     TextField(
@@ -168,15 +146,6 @@ class _LoginPageState extends State<LoginPage> {
                         prefixIcon: const Icon(Icons.lock),
                         hintText: "********",
                         border: OutlineInputBorder(
-                          borderSide: const BorderSide(
-                            color: Color(0xFF5BBCDC),
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(
-                            color: Color(0xFF5BBCDC),
-                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         focusedBorder: OutlineInputBorder(
@@ -200,8 +169,6 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                     ),
-
-                    // Esqueci minha senha
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -210,17 +177,14 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-
-                    // Botão Entrar
                     ElevatedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : _onLoginPressed, // Desabilita durante o loading
+                      onPressed: _isLoading ? null : _onLoginPressed,
                       style: ButtonStyle(
                         backgroundColor:
                             WidgetStateProperty.resolveWith<Color?>((states) {
-                              if (states.contains(WidgetState.hovered))
+                              if (states.contains(WidgetState.hovered)) {
                                 return const Color(0xFF166580);
+                              }
                               return const Color(0xFF1D80A1);
                             }),
                         foregroundColor: WidgetStateProperty.all<Color>(
@@ -255,12 +219,9 @@ class _LoginPageState extends State<LoginPage> {
                             )
                           : const Text("Entrar"),
                     ),
-
                     const SizedBox(height: 16),
                     const Center(child: Text("OU")),
                     const SizedBox(height: 16),
-
-                    // Botão Cadastrar-se
                     ElevatedButton(
                       onPressed: () {
                         Navigator.pushNamed(context, '/register');
@@ -268,8 +229,9 @@ class _LoginPageState extends State<LoginPage> {
                       style: ButtonStyle(
                         backgroundColor:
                             WidgetStateProperty.resolveWith<Color?>((states) {
-                              if (states.contains(WidgetState.hovered))
+                              if (states.contains(WidgetState.hovered)) {
                                 return const Color(0xFF317714);
+                              }
                               return const Color(0xFF42A01C);
                             }),
                         foregroundColor: WidgetStateProperty.all<Color>(

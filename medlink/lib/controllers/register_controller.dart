@@ -85,12 +85,36 @@ class RegisterController {
     }
   }
 
+  String _limparCPF(String cpf) {
+    return cpf.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
   // Função simples para validar CPF
   bool _isValidCpf(String cpf) {
-    final regex = RegExp(r'^\d{11}$');
-    return regex.hasMatch(
-      cpf.replaceAll(RegExp(r'\D'), ''),
-    ); // aceita só números
+    final cpfLimpo = _limparCPF(cpf); // Usa a função de limpeza
+
+    if (cpfLimpo.length != 11) return false;
+    if (RegExp(r'^(\d)\1{10}$').hasMatch(cpfLimpo)) return false;
+
+    List<int> numbers = cpfLimpo.split('').map(int.parse).toList();
+
+    int soma1 = 0;
+    for (int i = 0; i < 9; i++) {
+      soma1 += numbers[i] * (10 - i);
+    }
+    int digito1 = (soma1 * 10) % 11;
+    if (digito1 == 10) digito1 = 0;
+    if (digito1 != numbers[9]) return false;
+
+    int soma2 = 0;
+    for (int i = 0; i < 10; i++) {
+      soma2 += numbers[i] * (11 - i);
+    }
+    int digito2 = (soma2 * 10) % 11;
+    if (digito2 == 10) digito2 = 0;
+    if (digito2 != numbers[10]) return false;
+
+    return true;
   }
 
   // Função simples para validar email
