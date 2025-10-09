@@ -1,33 +1,40 @@
+// lib/models/consultas.dart (VERSÃO COMPLETA E CORRIGIDA)
+
 class Consulta {
-  final int pacienteId; // novo
-  final DateTime data;
+  final int id;
   final DateTime horario;
+  final String status;
   final String especialidade;
   final String profissional;
 
   Consulta({
-    required this.pacienteId, // novo
-    required this.data,
+    required this.id,
     required this.horario,
+    required this.status,
     required this.especialidade,
     required this.profissional,
   });
 
+  // Factory atualizada para ler o JSON da API de histórico
   factory Consulta.fromJson(Map<String, dynamic> json) {
+    final medicoDetalhes = json['medico_detalhes'] as Map<String, dynamic>?;
+
     return Consulta(
-      pacienteId: json['pacienteId'], // novo
-      data: DateTime.parse(json['data']),
-      horario: DateTime.parse(json['horario']),
-      especialidade: json['especialidade'],
-      profissional: json['profissional'],
+      id: json['id'] ?? 0, // Lê o ID
+      horario: DateTime.parse(json['data_hora']),
+      status: json['status_atual'] ?? 'N/A',
+      especialidade: medicoDetalhes?['especialidade'] ?? 'Não informada',
+      profissional: medicoDetalhes?['nome_completo'] ?? 'Não informado',
     );
   }
 
+  // --- CORREÇÃO: ADICIONADO O MÉTODO toJson ---
+  // Isto resolve o erro que estava a acontecer no ficheiro paciente.dart
   Map<String, dynamic> toJson() {
     return {
-      'pacienteId': pacienteId, // novo
-      'data': data.toIso8601String(),
-      'horario': horario.toIso8601String(),
+      'id': id,
+      'data_hora': horario.toIso8601String(),
+      'status_atual': status,
       'especialidade': especialidade,
       'profissional': profissional,
     };
