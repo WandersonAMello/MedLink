@@ -121,6 +121,34 @@ class ApiService {
     }
   }
 
+  // --- 👇 NOVO MÉTODO ADICIONADO AQUI 👇 ---
+  Future<Map<String, List<dynamic>>> getMedicoAgenda(int year, int month) async {
+    final url = Uri.parse("$baseUrl/api/medicos/agenda/?year=$year&month=$month");
+
+    if (_accessToken == null) {
+      throw Exception('Token de acesso não encontrado.');
+    }
+
+    final response = await http.get(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $_accessToken",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      // O corpo da resposta é um mapa, então fazemos o decode diretamente
+      final Map<String, dynamic> body = jsonDecode(utf8.decode(response.bodyBytes));
+      
+      // Convertemos as chaves de String para DateTime para usar no calendário
+      return body.map((key, value) => MapEntry(key, value as List<dynamic>));
+
+    } else {
+      throw Exception('Falha ao carregar a agenda: ${response.statusCode}');
+    }
+  }
+
   // ✅ DASHBOARD STATS
   Future<DashboardStats> getDashboardStats(String accessToken) async {
     final url = Uri.parse("$baseUrl/api/secretarias/dashboard/stats/");
