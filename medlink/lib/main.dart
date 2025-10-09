@@ -10,6 +10,7 @@ import 'views/pages/dashboard_page.dart';
 import 'views/pages/admin.dart';
 import 'views/pages/admin_edit_user_page.dart';
 import 'views/pages/medico_dashboard_page.dart';
+import 'views/pages/medico_agenda_page.dart';
 
 // Controllers
 import 'controllers/paciente_controller.dart';
@@ -51,6 +52,7 @@ class MyApp extends StatelessWidget {
         '/secretary/dashboard': (context) => const SecretaryDashboard(),
         '/admin/dashboard': (context) => const AdminDashboard(),
         '/doctor/dashboard': (context) => const MedicoDashboardPage(),
+        '/doctor/agenda': (context) => const MedicoAgendaPage(),
         // NOVA rota do médico
         '/admin/edit-user': (context) {
           // Pega o ID do usuário passado como argumento na navegação
@@ -58,8 +60,6 @@ class MyApp extends StatelessWidget {
           return AdminEditUserPage(userId: userId);
         },
         '/user/dashboard': (context) => const HomePage(),
-        // TODO: Adicione as rotas para os outros perfis aqui quando as telas existirem
-        // '/patient/dashboard': (context) => const PatientDashboard(),
       },
     );
   }

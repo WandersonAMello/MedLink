@@ -1,24 +1,66 @@
-# medicos/views.py
+# medicos/views.py (VERSÃO CORRIGIDA E COMPLETA)
 
 from rest_framework.generics import ListAPIView, UpdateAPIView
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from agendamentos.models import Consulta
-from agendamentos.serializers import ConsultaSerializer
-from users.permissions import IsMedicoUser
 
-class MedicoAgendaAPIView(ListAPIView):
+from agendamentos.models import Consulta, ConsultaStatusLog
+from agendamentos.serializers import ConsultaSerializer
+from agendamentos.consts import STATUS_CONSULTA_REAGENDAMENTO_SOLICITADO # <-- Importação corrigida
+from users.permissions import IsMedicoUser
+from .models import Medico
+from .serializers import MedicoSerializer
+
+
+# --- VIEW DA AGENDA (LÓGICA CORRIGIDA) ---
+class MedicoAgendaAPIView(APIView):
     """
-    API view para o médico visualizar a sua própria agenda de consultas.
-    A agenda é retornada em formato de lista. O frontend será responsável
-    por exibir em formato de calendário.
+    Fornece as consultas de um mês específico para o médico logado,
+    agrupadas por dia para o calendário.
     """
-    serializer_class = ConsultaSerializer
     permission_classes = [IsAuthenticated, IsMedicoUser]
 
-    def get_queryset(self):
-        # Filtra as consultas para retornar apenas as do médico logado.
-        return Consulta.objects.filter(medico=self.request.user).order_by('data_hora')
-    
+    def get(self, request, *args, **kwargs):
+        medico = request.user
+        
+        # Pega o ano e o mês dos parâmetros da URL (ex: /?year=2025&month=10)
+        try:
+            year = int(request.query_params.get('year'))
+            month = int(request.query_params.get('month'))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Os parâmetros 'year' e 'month' são obrigatórios e devem ser números."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Filtra as consultas do médico para o mês e ano especificados
+        consultas_do_mes = Consulta.objects.filter(
+            medico=medico,
+            data_hora__year=year,
+            data_hora__month=month
+        ).select_related('paciente__user').order_by('data_hora')
+
+        # Agrupa as consultas por dia
+        agenda_formatada = {}
+        for consulta in consultas_do_mes:
+            dia = consulta.data_hora.strftime('%Y-%m-%d')
+            if dia not in agenda_formatada:
+                agenda_formatada[dia] = []
+            
+            # Adiciona um objeto simples para cada consulta
+            agenda_formatada[dia].append({
+                'id': consulta.id,
+                'horario': consulta.data_hora.strftime('%H:%M'),
+                'paciente': consulta.paciente.nome_completo, # Acessa a property do modelo
+            })
+            
+        return Response(agenda_formatada, status=status.HTTP_200_OK)
+
+
+# --- O RESTO DO FICHEIRO CONTINUA IGUAL ---
+
 class SolicitarReagendamentoAPIView(UpdateAPIView):
     """
     Endpoint para um médico solicitar o reagendamento de uma consulta.
@@ -51,21 +93,11 @@ class SolicitarReagendamentoAPIView(UpdateAPIView):
             status_novo=novo_status,
             pessoa=request.user
         )
-
-        # TODO (Lembrete para o futuro): Implementar a lógica para notificar a secretária.
-
+        
         serializer = self.get_serializer(consulta)
         return Response(serializer.data)
-    
-from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticated
-from .models import Medico
-from .serializers import MedicoSerializer
-
-# ... (suas outras views, MedicoAgendaAPIView etc., continuam aqui) ...
 
 
-# 👇 ADICIONE ESTA NOVA VIEW 👇
 class MedicoListView(ListAPIView):
     """
     View para listar todos os médicos ativos.

@@ -1,4 +1,4 @@
-// lib/views/pages/medico_dashboard_page.dart
+// lib/views/pages/medico_dashboard_page.dart (VERSÃO ATUALIZADA)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +7,7 @@ import '../../controllers/paciente_controller.dart';
 import '../../models/paciente.dart';
 import '../widgets/paciente_card.dart';
 import '../../models/relatorio.dart';
-import '../../models/consultas.dart' as consultas_model;
+import '../widgets/medico_app_bar.dart'; // <-- 1. IMPORTE A NOSSA APPBAR
 
 class MedicoDashboardPage extends StatelessWidget {
   const MedicoDashboardPage({super.key});
@@ -19,104 +19,21 @@ class MedicoDashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Usamos 'watch' para que a UI se reconstrua quando o controller notificar mudanças.
     final pacienteController = context.watch<PacienteController>();
     final today = DateTime.now();
     final formattedDate = DateFormat('dd/MM/yyyy').format(today);
 
-    Color menuTextColor(String menu) {
-      return menu == "Dashboard" ? Colors.yellowAccent : Colors.white;
-    }
-
     return Scaffold(
       backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: primaryBlue,
-        toolbarHeight: 60,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Image.asset('assets/images/Logo2.png', height: 40),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton(
-                  onPressed: () {},
-                  child: Text(
-                    "Dashboard",
-                    style: TextStyle(color: menuTextColor("Dashboard")),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                TextButton(
-                  onPressed: () {},
-                  child: Text(
-                    "Agenda",
-                    style: TextStyle(color: menuTextColor("Agenda")),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                TextButton(
-                  onPressed: () {},
-                  child: Text(
-                    "Estatísticas",
-                    style: TextStyle(color: menuTextColor("Estatísticas")),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                TextButton(
-                  onPressed: () {},
-                  child: Text(
-                    "Configurações",
-                    style: TextStyle(color: menuTextColor("Configurações")),
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () {},
-                  icon: const Icon(
-                    Icons.notifications_none,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: Icon(Icons.person, color: primaryBlue),
-                ),
-                const SizedBox(width: 12),
-                TextButton.icon(
-                  onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/',
-                      (route) => false,
-                    );
-                  },
-                  icon: const Icon(Icons.logout, color: Colors.white),
-                  label: const Text(
-                    "Sair",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  style: ButtonStyle(
-                    overlayColor: MaterialStateProperty.all(hoverColor),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+      // 2. SUBSTITUA O APPBAR ANTIGO POR ESTE
+      appBar: const MedicoAppBar(activePage: "Dashboard"),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ---------------- Coluna esquerda ----------------
+              // Coluna da esquerda (lista de pacientes) - SEM ALTERAÇÕES
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 0, 12),
                 child: Container(
@@ -160,17 +77,12 @@ class MedicoDashboardPage extends StatelessWidget {
                                   accentGreen,
                                 ),
                                 overlayColor:
-                                    MaterialStateProperty.resolveWith<Color?>((
-                                      Set<MaterialState> states,
-                                    ) {
-                                      if (states.contains(
-                                        MaterialState.hovered,
-                                      ))
-                                        return Colors.greenAccent.withOpacity(
-                                          0.3,
-                                        );
-                                      return null;
-                                    }),
+                                    MaterialStateProperty.resolveWith<Color?>(
+                                        (states) {
+                                  if (states.contains(MaterialState.hovered))
+                                    return Colors.greenAccent.withOpacity(0.3);
+                                  return null;
+                                }),
                                 shape: MaterialStateProperty.all(
                                   RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
@@ -192,25 +104,25 @@ class MedicoDashboardPage extends StatelessWidget {
 
               const SizedBox(width: 15),
 
-              // ---------------- Coluna central ----------------
+              // Coluna central (detalhes do paciente) - SEM ALTERAÇÕES
               Expanded(
                 child: pacienteController.isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : pacienteController.pacienteSelecionado == null
-                    ? Center(
-                        child: Text(
-                          pacienteController.errorMessage ??
-                              'Nenhum paciente para exibir.',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey,
+                        ? Center(
+                            child: Text(
+                              pacienteController.errorMessage ??
+                                  'Nenhum paciente para exibir.',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          )
+                        : buildDashboardContent(
+                            context,
+                            pacienteController.pacienteSelecionado!,
                           ),
-                        ),
-                      )
-                    : buildDashboardContent(
-                        context,
-                        pacienteController.pacienteSelecionado!,
-                      ),
               ),
             ],
           ),
@@ -219,7 +131,9 @@ class MedicoDashboardPage extends StatelessWidget {
     );
   }
 
+  // O resto do ficheiro (buildPacientesList, buildDashboardContent) continua exatamente igual...
   Widget buildPacientesList(PacienteController controller) {
+    // ... CÓDIGO SEM ALTERAÇÕES ...
     if (controller.isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: Colors.white),
@@ -263,7 +177,7 @@ class MedicoDashboardPage extends StatelessWidget {
     BuildContext context,
     Paciente pacienteSelecionado,
   ) {
-    // A variável 'historico' pode ser usada mais tarde para a lista de histórico
+    // ... CÓDIGO SEM ALTERAÇÕES ...
     final historico = pacienteSelecionado.consultasHistoricas;
 
     final historicoRelatorios = [
@@ -285,7 +199,6 @@ class MedicoDashboardPage extends StatelessWidget {
             flex: 225,
             child: Row(
               children: [
-                // Bloco 1 -> Informações do Paciente (sem alterações)
                 Flexible(
                   flex: 2,
                   child: Container(
@@ -330,10 +243,8 @@ class MedicoDashboardPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 15),
-
-                // --- BLOCO 2 CORRIGIDO (Layout e Dados) ---
                 SizedBox(
-                  width: 300, // 1. CORREÇÃO DE LAYOUT: Tamanho fixo restaurado
+                  width: 300,
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -353,7 +264,6 @@ class MedicoDashboardPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        // 2. CORREÇÃO DE DADOS: Usando os campos corretos do paciente
                         Text(
                           "Data/Hora: ${DateFormat('dd/MM/yyyy HH:mm').format(pacienteSelecionado.horario)}",
                           style: const TextStyle(color: Colors.white70),
@@ -379,7 +289,6 @@ class MedicoDashboardPage extends StatelessWidget {
           Expanded(
             flex: 300,
             child: Row(
-              // ... (O resto do seu layout para anotações e relatórios continua aqui, sem alterações)
               children: [
                 Flexible(
                   flex: 2,
@@ -495,7 +404,6 @@ class MedicoDashboardPage extends StatelessWidget {
           Expanded(
             flex: 250,
             child: Row(
-              // ... (O restante do layout continua aqui, sem alterações)
               children: [
                 Flexible(
                   flex: 2,
