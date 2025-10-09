@@ -401,6 +401,7 @@ class MedicoDashboardPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 15),
+          // --- SUBSTITUA O EXPANDED DA LINHA 3 POR ESTE ---
           Expanded(
             flex: 250,
             child: Row(
@@ -425,66 +426,92 @@ class MedicoDashboardPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
+
+                        // --- LÓGICA DINÂMICA COM SCROLL ---
                         Expanded(
-                          child: historico.isEmpty
-                              ? const Center(
+                          child: Consumer<PacienteController>(
+                            builder: (context, controller, child) {
+                              if (controller.isHistoricoLoading) {
+                                return const Center(
+                                  child: CircularProgressIndicator(color: Colors.white),
+                                );
+                              }
+
+                              if (controller.historicoErrorMessage != null) {
+                                return const Center(
                                   child: Text(
-                                    "Sem consultas anteriores...",
+                                    "Erro ao carregar histórico.",
                                     style: TextStyle(color: Colors.white70),
                                   ),
-                                )
-                              : ListView.builder(
-                                  itemCount: historico.length,
-                                  itemBuilder: (context, index) {
-                                    final consulta = historico[index];
-                                    return ListTile(
+                                );
+                              }
+
+                              if (controller.historicoConsultas.isEmpty) {
+                                return const Center(
+                                  child: Text(
+                                    "Nenhuma consulta encontrada para este paciente.",
+                                    style: TextStyle(color: Colors.white70),
+                                  ),
+                                );
+                              }
+
+                              // A lista com scroll interno
+                              return ListView.builder(
+                                itemCount: controller.historicoConsultas.length,
+                                itemBuilder: (context, index) {
+                                  final consulta = controller.historicoConsultas[index];
+                                  final bool isFuture = consulta.horario.isAfter(DateTime.now());
+                                  
+                                  return Card(
+                                    color: Colors.white.withOpacity(0.1),
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
                                       title: Text(
-                                        "Data/Hora: ${DateFormat('dd/MM/yyyy HH:mm').format(consulta.horario)}",
-                                        style: const TextStyle(
-                                          color: Colors.white70,
+                                        "${DateFormat('dd/MM/yyyy \'às\' HH:mm').format(consulta.horario)} - ${consulta.status}",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          fontStyle: isFuture ? FontStyle.italic : FontStyle.normal,
                                         ),
                                       ),
                                       subtitle: Text(
-                                        "Especialidade: ${consulta.especialidade}\nProfissional: ${consulta.profissional}",
+                                        "Especialidade: ${consulta.especialidade}",
                                         style: const TextStyle(
                                           color: Colors.white70,
+                                          fontSize: 12,
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(width: 15),
+                // O bloco de botões à direita continua o mesmo
                 Flexible(
                   flex: 1,
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: MedicoDashboardPage.primaryBlue,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    decoration: BoxDecoration(color: MedicoDashboardPage.primaryBlue, borderRadius: BorderRadius.circular(8)),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         ElevatedButton(
                           onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: MedicoDashboardPage.accentGreen,
-                            minimumSize: const Size(double.infinity, 40),
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: MedicoDashboardPage.accentGreen, minimumSize: const Size(double.infinity, 40)),
                           child: const Text("Reagendar Consulta"),
                         ),
                         const SizedBox(height: 12),
                         ElevatedButton(
                           onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent,
-                            minimumSize: const Size(double.infinity, 40),
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, minimumSize: const Size(double.infinity, 40)),
                           child: const Text("Finalizar Consulta"),
                         ),
                       ],

@@ -9,6 +9,7 @@ import '../models/dashboard_stats_model.dart';
 import '../models/patient_model.dart';
 import '../models/doctor_model.dart';
 import '../models/paciente.dart';
+import '../models/consultas.dart' as consultas_model;
 
 class ApiService {
   // ✅ Base URL unificada
@@ -118,6 +119,30 @@ class ApiService {
       throw Exception(
         'Falha ao carregar pacientes do dia: ${response.statusCode}',
       );
+    }
+  }
+
+  // --- NOVO MÉTODO ADICIONADO AQUI ---
+  Future<List<consultas_model.Consulta>> getHistoricoConsultas(int pacienteId) async {
+    final url = Uri.parse("$baseUrl/api/pacientes/$pacienteId/historico/");
+
+    if (_accessToken == null) {
+      throw Exception('Token de acesso não encontrado.');
+    }
+
+    final response = await http.get(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $_accessToken",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> body = jsonDecode(utf8.decode(response.bodyBytes));
+      return body.map((json) => consultas_model.Consulta.fromJson(json)).toList();
+    } else {
+      throw Exception('Falha ao carregar o histórico: ${response.statusCode}');
     }
   }
 
