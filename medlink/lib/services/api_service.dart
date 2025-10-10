@@ -146,6 +146,45 @@ class ApiService {
     }
   }
 
+  // --- NOVOS MÉTODOS PARA ANOTAÇÕES ---
+  
+  // Busca a anotação de uma consulta específica
+  Future<String?> getAnotacao(int consultaId) async {
+    final url = Uri.parse("$baseUrl/api/agendamentos/$consultaId/anotacao/");
+    if (_accessToken == null) return null;
+
+    final response = await http.get(url, headers: {"Authorization": "Bearer $_accessToken"});
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      return data['conteudo'];
+    }
+    // Se a anotação não existir, a API retornará 404, o que é normal.
+    if (response.statusCode == 404) {
+      return ""; // Retorna string vazia se não houver anotação
+    }
+    throw Exception('Falha ao carregar anotação.');
+  }
+
+  // Salva ou atualiza a anotação de uma consulta
+  Future<void> salvarAnotacao(int consultaId, String conteudo) async {
+    final url = Uri.parse("$baseUrl/api/agendamentos/$consultaId/anotacao/");
+    if (_accessToken == null) throw Exception('Token não encontrado.');
+
+    final response = await http.post(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $_accessToken",
+      },
+      body: jsonEncode({'conteudo': conteudo}),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Falha ao salvar anotação.');
+    }
+  }
+
   // --- 👇 NOVO MÉTODO ADICIONADO AQUI 👇 ---
   Future<Map<String, List<dynamic>>> getMedicoAgenda(int year, int month) async {
     final url = Uri.parse("$baseUrl/api/medicos/agenda/?year=$year&month=$month");

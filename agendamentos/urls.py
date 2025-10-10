@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ConsultaAPIView, ConsultaStatusUpdateView, PagamentoUpdateView
+from .views import ConsultaAPIView, ConsultaStatusUpdateView, PagamentoUpdateView, AnotacaoConsultaView
 
 urlpatterns = [
     path('', ConsultaAPIView.as_view(), name='agendamentos-list-create'),
@@ -12,4 +12,6 @@ urlpatterns = [
     
     # CORREÇÃO: Deve ser <int:pk>
     path('<int:pk>/pagamento/', PagamentoUpdateView.as_view(), name='agendamentos-pagamento-update'),
+
+    path('<int:pk>/anotacao/', AnotacaoConsultaView.as_view(), name='agendamentos-anotacao'),
 ]

@@ -1,4 +1,4 @@
-// lib/models/consultas.dart (VERSÃO COMPLETA E CORRIGIDA)
+// lib/models/consultas.dart (VERSÃO ATUALIZADA)
 
 class Consulta {
   final int id;
@@ -6,6 +6,7 @@ class Consulta {
   final String status;
   final String especialidade;
   final String profissional;
+  final String? anotacaoConteudo; // <-- NOVO CAMPO ADICIONADO
 
   Consulta({
     required this.id,
@@ -13,23 +14,22 @@ class Consulta {
     required this.status,
     required this.especialidade,
     required this.profissional,
+    this.anotacaoConteudo, // <-- Adicionado ao construtor
   });
 
-  // Factory atualizada para ler o JSON da API de histórico
   factory Consulta.fromJson(Map<String, dynamic> json) {
     final medicoDetalhes = json['medico_detalhes'] as Map<String, dynamic>?;
 
     return Consulta(
-      id: json['id'] ?? 0, // Lê o ID
+      id: json['id'] ?? 0,
       horario: DateTime.parse(json['data_hora']),
       status: json['status_atual'] ?? 'N/A',
       especialidade: medicoDetalhes?['especialidade'] ?? 'Não informada',
       profissional: medicoDetalhes?['nome_completo'] ?? 'Não informado',
+      anotacaoConteudo: json['anotacao_conteudo'], // <-- Lendo o novo campo
     );
   }
 
-  // --- CORREÇÃO: ADICIONADO O MÉTODO toJson ---
-  // Isto resolve o erro que estava a acontecer no ficheiro paciente.dart
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -37,6 +37,7 @@ class Consulta {
       'status_atual': status,
       'especialidade': especialidade,
       'profissional': profissional,
+      'anotacao_conteudo': anotacaoConteudo,
     };
   }
 }
