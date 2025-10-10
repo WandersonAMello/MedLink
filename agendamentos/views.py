@@ -1,4 +1,4 @@
-#agendamentos/views.py (VERSÃO CORRIGIDA)
+# agendamentos/views.py (VERSÃO CORRIGIDA E COMPLETA)
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,10 +6,13 @@ from rest_framework import status
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from .models import Consulta, Pagamento, ConsultaStatusLog
-from .serializers import ConsultaSerializer
-from users.permissions import IsMedicoOrSecretaria
 from datetime import timedelta
+
+# --- CORREÇÃO: ADICIONADAS AS IMPORTAÇÕES QUE FALTAVAM ---
+from .models import Consulta, Pagamento, ConsultaStatusLog, AnotacaoConsulta
+from .serializers import ConsultaSerializer, AnotacaoConsultaSerializer
+from users.permissions import IsMedicoOrSecretaria
+
 
 class ConsultaAPIView(APIView):
     """
@@ -19,19 +22,12 @@ class ConsultaAPIView(APIView):
     permission_classes = [IsMedicoOrSecretaria]
 
     def get_queryset(self):
-        """
-        Retorna as consultas da clínica do usuário logado.
-        """
         user = self.request.user
-        # Lembrete: Implemente os modelos 'Medico' e 'Secretaria' para evitar este 'try/except'
         if user.user_type == 'MEDICO':
-            # Filtra consultas do médico logado
             return Consulta.objects.filter(medico=user).order_by('data_hora')
         elif user.user_type == 'SECRETARIA':
-            # Filtra consultas da clínica da secretária logada
             try:
-                # Supondo que o modelo Secretaria tenha uma FK para Clinica
-                clinica = user.secretaria_perfil.clinica 
+                clinica = user.perfil_secretaria.clinica 
                 return Consulta.objects.filter(clinica=clinica).order_by('data_hora')
             except AttributeError:
                 return Consulta.objects.none()
@@ -81,7 +77,6 @@ class ConsultaAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # MÉTODO 'PUT' ADICIONADO NO LUGAR CORRETO
     def put(self, request, pk=None):
         if pk is None:
             return Response(
@@ -90,14 +85,12 @@ class ConsultaAPIView(APIView):
             )
 
         consulta = get_object_or_404(self.get_queryset(), pk=pk)
-        # partial=True permite atualizações parciais (só data, só status, ou ambos)
         serializer = ConsultaSerializer(consulta, data=request.data, partial=True)
 
         if serializer.is_valid(raise_exception=True):
             data_hora_nova = serializer.validated_data.get('data_hora', consulta.data_hora)
             medico = consulta.medico
 
-            # Validação de conflito de horário, excluindo a própria consulta
             if 'data_hora' in serializer.validated_data:
                 conflitos = Consulta.objects.filter(
                     medico=medico,
@@ -115,7 +108,6 @@ class ConsultaAPIView(APIView):
                     status_anterior = consulta.status_atual
                     consulta_atualizada = serializer.save()
 
-                    # Se o status foi alterado, cria um log
                     if consulta_atualizada.status_atual != status_anterior:
                         ConsultaStatusLog.objects.create(
                             consulta=consulta_atualizada,
@@ -154,20 +146,16 @@ class ConsultaAPIView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 # -----------------------------------------------------------------------------
-# Views para a atualização de status e pagamento (lógica original)
+# Views para a atualização de status e pagamento
 # -----------------------------------------------------------------------------
 
 class ConsultaStatusUpdateView(APIView):
-    """
-    API para atualizar APENAS o status de uma consulta.
-    """
     permission_classes = [IsMedicoOrSecretaria]
 
     def put(self, request, pk):
         consulta = get_object_or_404(Consulta.objects.all(), pk=pk)
         novo_status = request.data.get('status_atual')
 
-        # Corrigido: Acessando choices do modelo, não da instância
         if not novo_status or novo_status not in [choice[0] for choice in Consulta.STATUS_CONSULTA_CHOICES]:
             return Response(
                 {"error": "O campo 'status_atual' com um valor válido é obrigatório."},
@@ -195,9 +183,6 @@ class ConsultaStatusUpdateView(APIView):
 
 
 class PagamentoUpdateView(APIView):
-    """
-    API para marcar o pagamento de uma consulta como concluído.
-    """
     permission_classes = [IsMedicoOrSecretaria]
 
     def put(self, request, pk):
@@ -211,17 +196,36 @@ class PagamentoUpdateView(APIView):
             )
         
         try:
-            # A transação agora só atualiza o pagamento
             with transaction.atomic():
                 pagamento.status = 'PAGO'
                 pagamento.data_pagamento = timezone.now()
                 pagamento.save()
-
-                # A LÓGICA QUE ATUALIZAVA A CONSULTA FOI REMOVIDA DAQUI
-
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Retornamos os dados da consulta para que o front-end possa ver a mudança
         serializer = ConsultaSerializer(consulta)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+# --- VIEW PARA ANOTAÇÕES (ADICIONADA NA RESPOSTA ANTERIOR) ---
+class AnotacaoConsultaView(APIView):
+    """
+    View para obter, criar ou atualizar a anotação de uma consulta específica.
+    """
+    permission_classes = [IsMedicoOrSecretaria]
+
+    def get(self, request, pk, *args, **kwargs):
+        anotacao = get_object_or_404(AnotacaoConsulta, pk=pk)
+        serializer = AnotacaoConsultaSerializer(anotacao)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, pk, *args, **kwargs):
+        consulta = get_object_or_404(Consulta, pk=pk)
+        conteudo = request.data.get('conteudo', '')
+
+        anotacao, created = AnotacaoConsulta.objects.update_or_create(
+            consulta=consulta,
+            defaults={'conteudo': conteudo}
+        )
+        serializer = AnotacaoConsultaSerializer(anotacao)
+        status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response(serializer.data, status=status_code)

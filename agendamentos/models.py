@@ -154,3 +154,28 @@ class ConsultaStatusLog(models.Model):
 
     def __str__(self):
         return f"Status da Consulta {self.consulta.id} alterado para {self.status_novo}"
+    
+# --- ADICIONE ESTA NOVA CLASSE AO FINAL DO FICHEIRO ---
+class AnotacaoConsulta(models.Model):
+    """
+    Armazena as anotações feitas por um médico para uma consulta específica.
+    A relação OneToOneField garante que cada consulta tenha apenas uma anotação.
+    """
+    consulta = models.OneToOneField(
+        Consulta,
+        on_delete=models.CASCADE,
+        primary_key=True, # A própria consulta é a chave
+        related_name='anotacao'
+    )
+    conteudo = models.TextField(
+        verbose_name=_("Conteúdo da Anotação")
+    )
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Anotação de Consulta")
+        verbose_name_plural = _("Anotações de Consulta")
+
+    def __str__(self):
+        return f"Anotação para a Consulta ID {self.consulta.id}"

@@ -1,15 +1,14 @@
-# pacientes/urls.py (VERSÃO CORRIGIDA)
+# pacientes/urls.py (VERSÃO ATUALIZADA)
 
 from django.urls import path
-from .views import PacienteCreateView, PacienteListView, PacientesDoDiaAPIView 
+# 1. Importe a nova view que vamos criar
+from .views import PacienteCreateView, PacienteListView, PacientesDoDiaAPIView, HistoricoPacienteAPIView 
 
 urlpatterns = [
-    # Rota para registrar um novo paciente
     path('register/', PacienteCreateView.as_view(), name='paciente-register'),
-
-    # Rota que retorna a lista de TODOS os pacientes
     path('', PacienteListView.as_view(), name='paciente-list'),
-    
-    # Rota que retorna a lista de pacientes do DIA para o médico
     path('hoje/', PacientesDoDiaAPIView.as_view(), name='pacientes-do-dia'),
+
+    # 2. Adicione esta nova rota para o histórico
+    path('<int:pk>/historico/', HistoricoPacienteAPIView.as_view(), name='paciente-historico'),
 ]
