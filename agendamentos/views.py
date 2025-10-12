@@ -12,6 +12,8 @@ from datetime import timedelta
 from .models import Consulta, Pagamento, ConsultaStatusLog, AnotacaoConsulta
 from .serializers import ConsultaSerializer, AnotacaoConsultaSerializer
 from users.permissions import IsMedicoOrSecretaria
+from .consts import STATUS_CONSULTA_CONCLUIDA
+from users.permissions import IsMedicoUser
 
 
 class ConsultaAPIView(APIView):
@@ -229,3 +231,45 @@ class AnotacaoConsultaView(APIView):
         serializer = AnotacaoConsultaSerializer(anotacao)
         status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
         return Response(serializer.data, status=status_code)
+    
+# ADICIONE ESTA NOVA CLASSE AO FINAL DO ARQUIVO
+class FinalizarConsultaAPIView(APIView):
+    """
+    Endpoint para um médico finalizar uma consulta.
+    Muda o status para 'CONCLUIDA' e salva a anotação final.
+    """
+    permission_classes = [IsMedicoUser]
+
+    def post(self, request, pk, *args, **kwargs):
+        consulta = get_object_or_404(Consulta, pk=pk, medico=request.user)
+        conteudo_anotacao = request.data.get('conteudo', '')
+
+        try:
+            with transaction.atomic():
+                # 1. Salva ou atualiza a anotação
+                AnotacaoConsulta.objects.update_or_create(
+                    consulta=consulta,
+                    defaults={'conteudo': conteudo_anotacao}
+                )
+
+                # 2. Atualiza o status da consulta
+                if consulta.status_atual != STATUS_CONSULTA_CONCLUIDA:
+                    status_anterior = consulta.status_atual
+                    consulta.status_atual = STATUS_CONSULTA_CONCLUIDA
+                    consulta.save()
+
+                    # 3. Cria um log da mudança de status
+                    ConsultaStatusLog.objects.create(
+                        consulta=consulta,
+                        status_novo=STATUS_CONSULTA_CONCLUIDA,
+                        pessoa=request.user
+                    )
+            
+            serializer = ConsultaSerializer(consulta)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Ocorreu um erro ao finalizar a consulta: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

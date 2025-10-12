@@ -306,6 +306,23 @@ class ApiService {
     );
   }
 
+   // 👇 ADICIONE ESTE NOVO MÉTODO 👇
+  Future<bool> finalizarConsulta(int consultaId, String conteudo) async {
+    final url = Uri.parse("$baseUrl/api/agendamentos/$consultaId/finalizar/");
+    if (_accessToken == null) throw Exception('Token não encontrado.');
+
+    final response = await http.post(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $_accessToken",
+      },
+      body: jsonEncode({'conteudo': conteudo}),
+    );
+
+    return response.statusCode == 200;
+  }
+
   // ✅ ADMIN (Usuários da Clínica)
   Future<List<AdminUser>> getClinicUsers(String accessToken) async {
     // 👇 CORREÇÃO: O caminho completo /api/admin/users/ é construído aqui

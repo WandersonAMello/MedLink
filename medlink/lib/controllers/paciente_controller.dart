@@ -75,6 +75,42 @@ class PacienteController extends ChangeNotifier {
     }
   }
 
+  // 👇 ADICIONE ESTE NOVO MÉTODO 👇
+  Future<bool> finalizarConsulta(String conteudo) async {
+    if (pacienteSelecionado == null) return false;
+
+    isSaving = true; // Reutiliza o estado de 'salvando'
+    notifyListeners();
+
+    try {
+      // Usa o ID correto da consulta que adicionamos ao modelo
+      final consultaId = pacienteSelecionado!.consultaId;
+      await _apiService.finalizarConsulta(consultaId, conteudo);
+
+      // Limpa a anotação atual para o próximo paciente
+      anotacaoAtual = "";
+
+      // Remove o paciente da lista da esquerda, pois a consulta foi concluída
+      pacientes.removeWhere((p) => p.id == pacienteSelecionado!.id);
+      
+      // Se ainda houver pacientes, seleciona o próximo. Senão, limpa a seleção.
+      if (pacientes.isNotEmpty) {
+        // Seleciona o primeiro da lista restante para não deixar a tela vazia
+        selecionarPaciente(0);
+      } else {
+        _selectedIndex = -1;
+      }
+
+      return true;
+    } catch (e) {
+      print("Erro ao finalizar consulta: $e");
+      return false;
+    } finally {
+      isSaving = false;
+      notifyListeners();
+    }
+  }
+
   // --- NOVO MÉTODO PARA BUSCAR A ANOTAÇÃO ---
   Future<void> _fetchAnotacao(int consultaId) async {
     isAnotacaoLoading = true;
