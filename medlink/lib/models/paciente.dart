@@ -4,6 +4,7 @@ import 'package:medlink/models/consultas.dart' as consultas_model;
 
 class Paciente {
   final int id;
+  final int consultaId;
   final String nome;
   final DateTime horario;
   final String status;
@@ -20,6 +21,7 @@ class Paciente {
 
   Paciente({
     required this.id,
+    required this.consultaId,
     required this.nome,
     required this.horario,
     required this.status,
@@ -34,6 +36,7 @@ class Paciente {
   factory Paciente.fromJson(Map<String, dynamic> json) {
     return Paciente(
       id: json['id'] ?? 0,
+      consultaId: json['consulta_id'] ?? 0,
       nome: json['nome_completo'] ?? 'Nome não encontrado',
       email: json['email'] ?? 'E-mail não informado',
       telefone: json['telefone'] ?? 'Telefone não informado',

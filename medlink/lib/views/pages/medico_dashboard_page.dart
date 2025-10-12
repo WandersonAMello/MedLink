@@ -394,13 +394,18 @@ class _MedicoDashboardPageState extends State<MedicoDashboardPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(backgroundColor: accentGreen, minimumSize: const Size(double.infinity, 40)),
-                          child: const Text("Reagendar Consulta"),
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () {},
+                          // 👇 ATUALIZE O onPressed AQUI 👇
+                          onPressed: () async {
+                            final success = await pacienteController.finalizarConsulta(_anotacoesController.text);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(success ? "Consulta finalizada com sucesso!" : "Erro ao finalizar consulta."),
+                                  backgroundColor: success ? Colors.green : Colors.red,
+                                ),
+                              );
+                            }
+                          },
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, minimumSize: const Size(double.infinity, 40)),
                           child: const Text("Finalizar Consulta"),
                         ),

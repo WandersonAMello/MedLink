@@ -38,6 +38,7 @@ class PacientesDoDiaAPIView(APIView):
         for consulta in consultas_de_hoje:
             dados_finais.append({
                 "id": consulta.paciente.user.id,
+                "consulta_id": consulta.id,
                 "nome_completo": consulta.paciente.nome_completo,
                 "email": consulta.paciente.user.email,
                 "telefone": consulta.paciente.telefone,
