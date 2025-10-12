@@ -20,7 +20,9 @@ class Secretaria(models.Model):
     clinica = models.ForeignKey(
         Clinica,
         on_delete=models.CASCADE,
-        related_name='secretarias'
+        related_name='secretarias',
+        null=True,  # Permite que o campo seja nulo no banco de dados
+        blank=True # Torna o campo opcional nos formulários do admin
     )
     
     # Campo para data de nascimento, opcional e consistente com o modelo Médico.

@@ -4,36 +4,35 @@ from .models import Medico
 
 @admin.register(Medico)
 class MedicoAdmin(admin.ModelAdmin):
-    """
-    Configuração da interface de administração para o perfil de Médico.
-    Esta classe customiza como os médicos são exibidos e gerenciados no painel admin.
-    """
-    
     # Exibe colunas com informações do perfil e do usuário associado
     list_display = (
-        'get_full_name', 
-        'crm', 
-        'especialidade', 
-        'clinica', 
+        'get_full_name',
+        'crm',
+        'especialidade',
+        'clinica',
         'get_email',
+        'data_nascimento',  # Campo adicionado para visualização rápida
         'get_user_is_active'
     )
 
-    # Adiciona filtros na lateral direita da tela
-    list_filter = ('especialidade', 'clinica')
+    # Adiciona filtros na lateral direita da tela (já otimizado)
+    list_filter = ('especialidade', 'clinica', 'user__is_active')
 
-    # Adiciona um campo de busca
+    # Adiciona um campo de busca (já otimizado)
     search_fields = (
-        'user__first_name', 
-        'user__last_name', 
-        'crm', 
+        'user__first_name',
+        'user__last_name',
+        'crm',
         'user__email'
     )
 
-    # Melhora a performance de seleção de chaves estrangeiras com muitos registros
+    # Melhora a performance de seleção de chaves estrangeiras
     raw_id_fields = ('user', 'clinica')
+    
+    # Adicionando campos que não devem ser editados diretamente aqui
+    readonly_fields = ('user',)
 
-    # Métodos para obter dados do modelo 'User' relacionado
+    # Métodos para obter dados do modelo 'User' relacionado (já otimizados)
     @admin.display(description='Nome Completo', ordering='user__first_name')
     def get_full_name(self, obj):
         return obj.user.get_full_name()

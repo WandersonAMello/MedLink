@@ -1,7 +1,7 @@
+# agendamentos/admin.py
 from django.contrib import admin
 from .models import Consulta, Pagamento, ConsultaStatusLog
 
-# Configuração para exibir o histórico de status de forma aninhada
 class ConsultaStatusLogInline(admin.TabularInline):
     model = ConsultaStatusLog
     extra = 0
@@ -15,20 +15,21 @@ class ConsultaStatusLogInline(admin.TabularInline):
     def has_change_permission(self, request, obj=None):
         return False
 
-# Configuração para exibir o pagamento de forma aninhada
 class PagamentoInline(admin.TabularInline):
     model = Pagamento
     extra = 0
-    fields = ('status', 'valor_pago', 'data_pagamento')
-    readonly_fields = ('data_criacao', 'data_atualizacao')
+    fields = ('status', 'valor_pago', 'data_pagamento', 'data_criacao', 'data_atualizacao')
+    readonly_fields = ('data_criacao', 'data_atualizacao') # Adicionado
     max_num = 1
     
-# Registra o modelo Consulta no painel de administração
 @admin.register(Consulta)
 class ConsultaAdmin(admin.ModelAdmin):
-    list_display = ('id', 'paciente', 'medico', 'data_hora', 'status_atual', 'valor')
+    list_display = ('id', 'paciente', 'medico', 'data_hora', 'status_atual', 'valor', 'data_criacao', 'data_atualizacao')
     list_filter = ('status_atual', 'clinica', 'medico', 'data_hora')
-    search_fields = ('paciente__nome_completo', 'medico__first_name', 'clinica__nome_fantasia')
+    search_fields = ('paciente__user__first_name', 'paciente__user__last_name', 'medico__first_name', 'clinica__nome_fantasia')
+    
+    # Adicionando campos apenas de leitura
+    readonly_fields = ('data_criacao', 'data_atualizacao')
     
     inlines = [PagamentoInline, ConsultaStatusLogInline]
 

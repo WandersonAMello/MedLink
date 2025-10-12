@@ -1,3 +1,4 @@
+# clinicas/admin.py
 from django.contrib import admin
 from .models import Clinica, Cidade, Estado, TipoClinica
 
@@ -22,4 +23,7 @@ class ClinicaAdmin(admin.ModelAdmin):
     list_display = ('nome_fantasia', 'cnpj', 'cidade', 'tipo_clinica', 'responsavel')
     search_fields = ('nome_fantasia', 'cnpj')
     list_filter = ('cidade', 'tipo_clinica')
-    raw_id_fields = ('cidade', 'responsavel') # Facilita a busca de cidades e usuários
+    raw_id_fields = ('cidade', 'responsavel')
+    
+    # Adicionando campos de data como apenas de leitura
+    readonly_fields = ('data_criacao', 'data_atualizacao')

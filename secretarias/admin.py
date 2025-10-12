@@ -4,22 +4,16 @@ from .models import Secretaria
 
 @admin.register(Secretaria)
 class SecretariaAdmin(admin.ModelAdmin):
-    """
-    Configuração da interface de administração para o perfil de Secretária.
-    """
-    
-    # Colunas exibidas na lista de secretárias
     list_display = (
         'get_full_name', 
         'clinica',
         'get_email',
+        'data_nascimento', # Adicionado para visualização
         'get_user_is_active'
     )
 
-    # Filtro por clínica
-    list_filter = ('clinica',)
+    list_filter = ('clinica', 'user__is_active')
 
-    # Campos de busca
     search_fields = (
         'user__first_name', 
         'user__last_name', 
@@ -27,10 +21,11 @@ class SecretariaAdmin(admin.ModelAdmin):
         'clinica__nome_fantasia'
     )
 
-    # Campo de busca para chaves estrangeiras
     raw_id_fields = ('user', 'clinica')
+    
+    # Adicionando campos que não devem ser editados diretamente aqui
+    readonly_fields = ('user',)
 
-    # Métodos para buscar dados do modelo User
     @admin.display(description='Nome Completo', ordering='user__first_name')
     def get_full_name(self, obj):
         return obj.user.get_full_name()
