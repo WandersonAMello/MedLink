@@ -2,6 +2,7 @@
 from django.db import models
 from django.conf import settings
 from clinicas.models import Clinica
+from users.models import User
 from django.utils.translation import gettext_lazy as _
 
 class Medico(models.Model):
@@ -55,3 +56,11 @@ class Medico(models.Model):
 
     def __str__(self):
         return f"Dr(a). {self.user.get_full_name()} (CRM: {self.crm})"
+    
+
+class MedicoUser(User):
+    """Modelo Proxy para tratar utilizadores do tipo Médico no admin."""
+    class Meta:
+        proxy = True
+        verbose_name = 'Médico (Utilizador)'
+        verbose_name_plural = 'Médicos (Utilizadores)'

@@ -3,6 +3,7 @@ from django.db import models
 from django.conf import settings
 from clinicas.models import Clinica
 from django.utils.translation import gettext_lazy as _
+from users.models import User
 
 class Secretaria(models.Model):
     """
@@ -35,3 +36,10 @@ class Secretaria(models.Model):
 
     def __str__(self):
         return self.user.get_full_name()
+    
+class SecretariaUser(User):
+    """Modelo Proxy para tratar utilizadores do tipo Secretária no admin."""
+    class Meta:
+        proxy = True
+        verbose_name = 'Secretária (Utilizador)'
+        verbose_name_plural = 'Secretárias (Utilizadores)'
