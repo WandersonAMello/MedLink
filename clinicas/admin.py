@@ -27,3 +27,7 @@ class ClinicaAdmin(admin.ModelAdmin):
     
     # Adicionando campos de data como apenas de leitura
     readonly_fields = ('data_criacao', 'data_atualizacao')
+    # --- A SOLUÇÃO ESTÁ AQUI ---
+    # Esta linha otimiza a consulta ao banco de dados, buscando os objetos
+    # relacionados (cidade, tipo_clinica e responsavel) em uma única query.
+    list_select_related = ('cidade', 'tipo_clinica', 'responsavel')
