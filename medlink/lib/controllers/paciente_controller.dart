@@ -58,23 +58,6 @@ class PacienteController extends ChangeNotifier {
     }
   }
 
-  // Atualize o selecionarPaciente para buscar também a anotação
-  void selecionarPaciente(int index) {
-    if (index >= 0 && index < pacientes.length) {
-      _selectedIndex = index;
-      final paciente = pacientes[index];
-
-      // Busca o histórico E a anotação da consulta atual
-      _fetchHistorico(paciente.id);
-      
-      // O ID da consulta de hoje já vem no objeto Paciente
-      final consultaDeHojeId = paciente.id; // Supondo que o ID do Paciente e Consulta coincidam neste contexto
-      _fetchAnotacao(consultaDeHojeId); 
-      
-      notifyListeners();
-    }
-  }
-
   // 👇 ADICIONE ESTE NOVO MÉTODO 👇
   Future<bool> finalizarConsulta(String conteudo) async {
     if (pacienteSelecionado == null) return false;
@@ -111,17 +94,49 @@ class PacienteController extends ChangeNotifier {
     }
   }
 
-  // --- NOVO MÉTODO PARA BUSCAR A ANOTAÇÃO ---
+   // O MÉTODO selecionarPaciente VOLTA AO NORMAL (REMOVA A LIMPEZA DAQUI)
+  void selecionarPaciente(int index) {
+    if (index >= 0 && index < pacientes.length) {
+      _selectedIndex = index;
+      final paciente = pacientes[index];
+
+      // Apenas chama os métodos de busca
+      _fetchHistorico(paciente.id);
+      
+      final consultaDeHojeId = paciente.consultaId;
+      _fetchAnotacao(consultaDeHojeId); 
+      
+      notifyListeners();
+    }
+  }
+
+  // --- CORREÇÃO APLICADA DIRETAMENTE AQUI ---
+  // ATUALIZE O MÉTODO _fetchAnotacao PARA ESTA VERSÃO:
   Future<void> _fetchAnotacao(int consultaId) async {
+    // 1. Limpa imediatamente o estado da anotação anterior e avisa a UI.
+    // Isso garante que o campo de texto fique em branco enquanto os novos dados são carregados.
+    anotacaoAtual = "";
     isAnotacaoLoading = true;
     notifyListeners();
+
     try {
-      anotacaoAtual = await _apiService.getAnotacao(consultaId) ?? "";
+      // 2. Busca a anotação para a nova consulta.
+      // O ApiService já retorna uma string vazia ("") caso a API retorne 404 (não encontrado).
+      final fetchedAnnotation = await _apiService.getAnotacao(consultaId) ?? "";
+      
+      // 3. Atualiza o estado com o conteúdo encontrado.
+      // Se por acaso uma anotação para a consulta de hoje já existir, o campo será preenchido.
+      // Caso contrário, ele permanecerá vazio, que é o comportamento esperado.
+      anotacaoAtual = fetchedAnnotation;
+
     } catch(e) {
       print("Erro ao buscar anotação: $e");
-      anotacaoAtual = ""; // Reseta em caso de erro
+      // Mantém o campo vazio em caso de qualquer erro.
+      anotacaoAtual = "";
     } finally {
       isAnotacaoLoading = false;
+      
+      // 4. Notifica a UI pela última vez com o estado final (ou com a anotação do dia, ou vazio).
       notifyListeners();
     }
   }
