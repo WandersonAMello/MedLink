@@ -16,7 +16,7 @@ class Paciente(models.Model):
     # Campos específicos do paciente
     telefone = models.CharField(max_length=15, blank=True)
     data_cadastro = models.DateTimeField(auto_now_add=True)
-    dados_clinicos = models.TextField(blank=True) # Campo para armazenar dados clínicos adicionais
+    dados_clinicos = models.TextField(blank=True)
 
     def __str__(self):
         # Acessa os dados do modelo User relacionado

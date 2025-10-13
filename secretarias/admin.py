@@ -1,44 +1,26 @@
-# secretarias/admin.py
+# secretarias/admin.py (NOVA VERSÃO)
+
 from django.contrib import admin
-from .models import Secretaria
+from .models import Secretaria, SecretariaUser
+from users.models import User
 
-@admin.register(Secretaria)
-class SecretariaAdmin(admin.ModelAdmin):
-    """
-    Configuração da interface de administração para o perfil de Secretária.
-    """
-    
-    # Colunas exibidas na lista de secretárias
-    list_display = (
-        'get_full_name', 
-        'clinica',
-        'get_email',
-        'get_user_is_active'
-    )
+# Inline para o perfil de Secretária
+class SecretariaProfileInline(admin.StackedInline):
+    model = Secretaria
+    can_delete = False
+    verbose_name_plural = 'Perfil da Secretária'
 
-    # Filtro por clínica
-    list_filter = ('clinica',)
+@admin.register(SecretariaUser)
+class SecretariaUserAdmin(admin.ModelAdmin):
+    # Mostra apenas utilizadores do tipo SECRETARIA nesta secção
+    def get_queryset(self, request):
+        return User.objects.filter(user_type='SECRETARIA')
 
-    # Campos de busca
-    search_fields = (
-        'user__first_name', 
-        'user__last_name', 
-        'user__email',
-        'clinica__nome_fantasia'
-    )
+    # Define o 'user_type' por defeito ao criar
+    def save_model(self, request, obj, form, change):
+        obj.user_type = 'SECRETARIA'
+        super().save_model(request, obj, form, change)
 
-    # Campo de busca para chaves estrangeiras
-    raw_id_fields = ('user', 'clinica')
-
-    # Métodos para buscar dados do modelo User
-    @admin.display(description='Nome Completo', ordering='user__first_name')
-    def get_full_name(self, obj):
-        return obj.user.get_full_name()
-
-    @admin.display(description='Email', ordering='user__email')
-    def get_email(self, obj):
-        return obj.user.email
-
-    @admin.display(description='Usuário Ativo?', ordering='user__is_active', boolean=True)
-    def get_user_is_active(self, obj):
-        return obj.user.is_active
+    inlines = [SecretariaProfileInline]
+    list_display = ('email', 'get_full_name', 'is_active')
+    fields = ('first_name', 'last_name', 'cpf', 'email', 'password')

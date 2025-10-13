@@ -4,16 +4,21 @@ from .models import Paciente
 
 @admin.register(Paciente)
 class PacienteAdmin(admin.ModelAdmin):
-    # 1. Atualize o list_display para usar os nomes dos métodos que vamos criar
+    # Campos a serem exibidos na lista
     list_display = ('get_nome_completo', 'get_cpf', 'telefone', 'get_email', 'data_cadastro')
 
-    # 2. Atualize o search_fields para seguir a relação com o User
+    # Campos de busca (já otimizados)
     search_fields = ('user__first_name', 'user__last_name', 'user__cpf', 'user__email')
 
-    # 3. Crie métodos para obter os dados do modelo User relacionado
+    # Adicionando filtro por data de cadastro
+    list_filter = ('data_cadastro',)
+
+    # Adicionando campos apenas de leitura
+    readonly_fields = ('data_cadastro',)
+
+    # Métodos para obter os dados do modelo User relacionado (já otimizados)
     @admin.display(description='Nome Completo', ordering='user__first_name')
     def get_nome_completo(self, obj):
-        # obj é a instância de Paciente
         return obj.user.get_full_name()
 
     @admin.display(description='CPF', ordering='user__cpf')

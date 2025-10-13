@@ -1,47 +1,23 @@
-# medicos/admin.py
+# medicos/admin.py (NOVA VERSÃO)
+
 from django.contrib import admin
-from .models import Medico
+from .models import Medico, MedicoUser
+from users.models import User
 
-@admin.register(Medico)
-class MedicoAdmin(admin.ModelAdmin):
-    """
-    Configuração da interface de administração para o perfil de Médico.
-    Esta classe customiza como os médicos são exibidos e gerenciados no painel admin.
-    """
-    
-    # Exibe colunas com informações do perfil e do usuário associado
-    list_display = (
-        'get_full_name', 
-        'crm', 
-        'especialidade', 
-        'clinica', 
-        'get_email',
-        'get_user_is_active'
-    )
+class MedicoProfileInline(admin.StackedInline):
+    model = Medico
+    can_delete = False
+    verbose_name_plural = 'Perfil do Médico'
 
-    # Adiciona filtros na lateral direita da tela
-    list_filter = ('especialidade', 'clinica')
+@admin.register(MedicoUser)
+class MedicoUserAdmin(admin.ModelAdmin):
+    def get_queryset(self, request):
+        return User.objects.filter(user_type='MEDICO')
 
-    # Adiciona um campo de busca
-    search_fields = (
-        'user__first_name', 
-        'user__last_name', 
-        'crm', 
-        'user__email'
-    )
+    def save_model(self, request, obj, form, change):
+        obj.user_type = 'MEDICO'
+        super().save_model(request, obj, form, change)
 
-    # Melhora a performance de seleção de chaves estrangeiras com muitos registros
-    raw_id_fields = ('user', 'clinica')
-
-    # Métodos para obter dados do modelo 'User' relacionado
-    @admin.display(description='Nome Completo', ordering='user__first_name')
-    def get_full_name(self, obj):
-        return obj.user.get_full_name()
-
-    @admin.display(description='Email', ordering='user__email')
-    def get_email(self, obj):
-        return obj.user.email
-    
-    @admin.display(description='Usuário Ativo?', ordering='user__is_active', boolean=True)
-    def get_user_is_active(self, obj):
-        return obj.user.is_active
+    inlines = [MedicoProfileInline]
+    list_display = ('email', 'get_full_name', 'is_active')
+    fields = ('first_name', 'last_name', 'cpf', 'email', 'password')
