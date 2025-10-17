@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../controllers/login_controller.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -13,6 +14,10 @@ class _LoginPageState extends State<LoginPage> {
   final _cpfController = TextEditingController();
   final _senhaController = TextEditingController();
   final LoginController _loginController = LoginController();
+  final _cpfMaskFormatter = MaskTextInputFormatter(
+    mask: '###.###.###-##',
+    filter: {"#": RegExp(r'[0-9]')},
+  );
 
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -77,69 +82,73 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF5BBCDC),
-      body: Center(
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 620),
-            child: Card(
-              elevation: 6,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              margin: const EdgeInsets.all(16),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(
-                      height: 80,
-                      child: Image.asset(
-                        'assets/images/Logo.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.broken_image, size: 80);
-                        },
-                      ),
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: const Color(0xFF5BBCDC),
+    body: Center(
+      child: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 620),
+          child: Card(
+            elevation: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            margin: const EdgeInsets.all(16),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 80,
+                    child: Image.asset(
+                      'assets/images/Logo.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.broken_image, size: 80);
+                      },
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "Realizar Login",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "Realizar Login",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(height: 24),
-                    const Text("CPF:"),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _cpfController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.badge),
-                        hintText: "000.000.000-00",
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text("CPF:"),
+                  const SizedBox(height: 8),
+                  // ===== INÍCIO DA CORREÇÃO =====
+                  TextField(
+                    controller: _cpfController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [_cpfMaskFormatter],
+                    // A 'decoration' foi movida para DENTRO do TextField
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.badge),
+                      hintText: "000.000.000-00",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(
+                          color: Color(0xFF5BBCDC),
+                          width: 2,
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(
-                            color: Color(0xFF5BBCDC),
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    const Text("Senha:"),
-                    const SizedBox(height: 8),
-                    TextField(
+                  ),
+                  // ===== FIM DA CORREÇÃO =====
+                  const SizedBox(height: 16),
+                  const Text("Senha:"),
+                  const SizedBox(height: 8),
+                  TextField(
                       controller: _senhaController,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
