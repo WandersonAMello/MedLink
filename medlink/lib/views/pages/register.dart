@@ -1,5 +1,9 @@
+// medlink/lib/views/pages/register.dart (VERSÃO COM LARGURA MÁXIMA)
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Importe para usar TextInputFormatter
 import '../../controllers/register_controller.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -17,6 +21,16 @@ class _RegisterPageState extends State<RegisterPage> {
   final _senhaController = TextEditingController();
   final _confirmarSenhaController = TextEditingController();
 
+  final _cpfMaskFormatter = MaskTextInputFormatter(
+    mask: '###.###.###-##',
+    filter: {"#": RegExp(r'[0-9]')},
+  );
+
+  final _phoneMaskFormatter = MaskTextInputFormatter(
+    mask: '(##) #####-####',
+    filter: {"#": RegExp(r'[0-9]')},
+  );
+
   bool _senhaVisivel = false;
   bool _confirmarSenhaVisivel = false;
 
@@ -27,91 +41,117 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Logo
-              Image.asset(
-                'assets/images/Logo2.png',
-                height: 100,
-              ),
-              const SizedBox(height: 20),
-
-              // Título
-              const Text(
-                "Cadastrar-se",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+          // ===== INÍCIO DA ALTERAÇÃO =====
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500), // Define a largura máxima aqui
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Logo
+                Image.asset(
+                  'assets/images/Logo2.png',
+                  height: 100,
                 ),
-              ),
-              const SizedBox(height: 30),
+                const SizedBox(height: 20),
 
-              // Campos de input
-              _buildTextField("Nome Completo", Icons.person, _nomeController),
-              const SizedBox(height: 15),
+                // Título
+                const Text(
+                  "Cadastrar-se",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 30),
 
-              _buildTextField("CPF", Icons.credit_card, _cpfController,
-                  hintText: "000.000.000-00"),
-              const SizedBox(height: 15),
+                // Campos de input
+                _buildTextField("Nome Completo", Icons.person, _nomeController),
+                const SizedBox(height: 15),
 
-              _buildTextField("E-mail", Icons.email, _emailController,
-                  hintText: "exemplo@email.com"),
-              const SizedBox(height: 15),
+                _buildTextField(
+                  "CPF",
+                  Icons.credit_card,
+                  _cpfController,
+                  hintText: "000.000.000-00",
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [_cpfMaskFormatter],
+                ),
+                const SizedBox(height: 15),
 
-              _buildTextField("Telefone", Icons.phone, _telefoneController,
-                  hintText: "(00) 00000-0000"),
-              const SizedBox(height: 15),
+                _buildTextField("E-mail", Icons.email, _emailController,
+                    hintText: "exemplo@email.com",
+                    keyboardType: TextInputType.emailAddress),
+                const SizedBox(height: 15),
 
-              // Senha com ícone de olho
-              _buildPasswordField("Senha", _senhaController, _senhaVisivel,
-                  () => setState(() => _senhaVisivel = !_senhaVisivel)),
-              const SizedBox(height: 15),
+                _buildTextField(
+                  "Telefone",
+                  Icons.phone,
+                  _telefoneController,
+                  hintText: "(00) 00000-0000",
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [_phoneMaskFormatter],
+                ),
+                const SizedBox(height: 15),
 
-              _buildPasswordField(
-                  "Confirmar Senha",
-                  _confirmarSenhaController,
-                  _confirmarSenhaVisivel,
-                  () => setState(
-                      () => _confirmarSenhaVisivel = !_confirmarSenhaVisivel)),
-              const SizedBox(height: 30),
+                // Senha com ícone de olho
+                _buildPasswordField("Senha", _senhaController, _senhaVisivel,
+                    () => setState(() => _senhaVisivel = !_senhaVisivel)),
+                const SizedBox(height: 15),
 
-              // Botão Cadastrar-se
-              _buildButton("Cadastrar-se", const Color(0xFF42A01C), () {
-                _registerController.register(
-                  context,
-                  username: _nomeController.text,
-                  cpf: _cpfController.text,
-                  email: _emailController.text,
-                  telefone: _telefoneController.text,
-                  password: _senhaController.text,
-                  confirmarSenha: _confirmarSenhaController.text,
-                );
-              }),
-              const SizedBox(height: 15),
+                _buildPasswordField(
+                    "Confirmar Senha",
+                    _confirmarSenhaController,
+                    _confirmarSenhaVisivel,
+                    () => setState(
+                        () => _confirmarSenhaVisivel = !_confirmarSenhaVisivel)),
+                const SizedBox(height: 30),
 
-              const Text("OU", style: TextStyle(color: Colors.white)),
-              const SizedBox(height: 15),
+                // Botão Cadastrar-se
+                _buildButton("Cadastrar-se", const Color(0xFF42A01C), () {
+                  _registerController.register(
+                    context,
+                    // Adapte os nomes dos parâmetros se forem diferentes no seu controller
+                    username: _nomeController.text,
+                    cpf: _cpfController.text,
+                    email: _emailController.text,
+                    telefone: _telefoneController.text,
+                    password: _senhaController.text,
+                    confirmarSenha: _confirmarSenhaController.text,
+                  );
+                }),
+                const SizedBox(height: 15),
 
-              // Botão Entrar
-              _buildButton("Entrar", const Color(0xFF1D80A1), () {
-                Navigator.pushReplacementNamed(context, '/');
-              }),
-            ],
+                const Text("OU", style: TextStyle(color: Colors.white)),
+                const SizedBox(height: 15),
+
+                // Botão Entrar
+                _buildButton("Entrar", const Color(0xFF1D80A1), () {
+                  Navigator.pushReplacementNamed(context, '/');
+                }),
+              ],
+            ),
           ),
+          // ===== FIM DA ALTERAÇÃO =====
         ),
       ),
     );
   }
 
-  // Função para criar campos de input
-  Widget _buildTextField(String label, IconData icon,
-      TextEditingController controller,
-      {bool obscureText = false, String? hintText}) {
+  Widget _buildTextField(
+    String label,
+    IconData icon,
+    TextEditingController controller, {
+    bool obscureText = false,
+    String? hintText,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         filled: true,
         fillColor: Colors.white,
@@ -134,7 +174,6 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  // Função para criar campos de senha com ícone de olho
   Widget _buildPasswordField(String label, TextEditingController controller,
       bool isVisible, VoidCallback toggleVisibility) {
     return TextField(
@@ -165,7 +204,6 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  // Função para criar botões atualizada para Flutter recente
   Widget _buildButton(String text, Color color, VoidCallback onPressed) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
