@@ -3,6 +3,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from .views import MyTokenObtainPairView, PasswordResetRequestView, PasswordResetConfirmView
 
 app_name = 'users'
 
@@ -13,4 +14,6 @@ urlpatterns = [
     ), name='login'),
     
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('request-password-reset/', PasswordResetRequestView.as_view(), name='request-password-reset'),
+    path('reset-password-confirm/', PasswordResetConfirmView.as_view(), name='reset-password-confirm'),
 ]

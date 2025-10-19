@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:medlink/views/pages/forgot_password_page.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../controllers/login_controller.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -172,7 +175,9 @@ class _LoginPageState extends State<LoginPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                         Get.to(() => ForgotPasswordPage());
+                        },
                         child: const Text("Esqueci minha senha"),
                       ),
                     ),
