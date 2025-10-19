@@ -469,4 +469,80 @@ class ApiService {
       body: jsonEncode(patientData),
     );
   }
+  Future<Map<String, dynamic>> requestPasswordReset(String email) async {
+    // Ajuste a URL para o seu endpoint real de "request-password-reset"
+    final url = Uri.parse('$baseUrl/api/users/request-password-reset/'); 
+    
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email}),
+      );
+
+      if (response.statusCode == 200) {
+        // O backend respondeu com sucesso
+        return {'success': true, 'message': 'E-mail de recuperação enviado.'};
+      } else {
+        // Tenta decodificar a mensagem de erro do backend
+        try {
+          final responseBody = json.decode(utf8.decode(response.bodyBytes));
+          // Assumindo que seu backend envia erros como {'error': '...'}
+          return {'success': false, 'message': responseBody['error'] ?? 'E-mail não encontrado ou inválido.'};
+        } catch (e) {
+          return {'success': false, 'message': 'Erro ao processar resposta do servidor. Status: ${response.statusCode}'};
+        }
+      }
+    } catch (e) {
+      // Erro de conexão
+      print('Erro de conexão em requestPasswordReset: $e');
+      return {'success': false, 'message': 'Não foi possível conectar ao servidor. Verifique sua internet.'};
+    }
+  }
+
+Future<Map<String, dynamic>> confirmPasswordReset(String uid, String token, String password) async {
+    
+    final url = Uri.parse('$baseUrl/api/users/reset-password-confirm/'); 
+    
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'uid': uid,
+          'token': token,
+          'password': password, // O backend espera 'password'
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // Sucesso
+        return {'success': true, 'message': 'Senha redefinida com sucesso.'};
+      } else {
+        // Tenta decodificar a mensagem de erro do backend
+        try {
+          final responseBody = json.decode(utf8.decode(response.bodyBytes));
+          // Pega a primeira mensagem de erro
+          String errorMessage = "Token inválido ou expirado.";
+          if (responseBody is Map) {
+             // Ex: {'password': ['erro...']} ou {'detail': 'erro...'}
+             final errors = responseBody.values.first;
+             if (errors is List) {
+               errorMessage = errors.first;
+             } else {
+               errorMessage = errors.toString();
+             }
+          }
+          return {'success': false, 'message': errorMessage};
+        } catch (e) {
+          return {'success': false, 'message': 'Erro no servidor. Status: ${response.statusCode}'};
+        }
+      }
+    } catch (e) {
+      // Erro de conexão
+      print('Erro de conexão em confirmPasswordReset: $e');
+      return {'success': false, 'message': 'Não foi possível conectar ao servidor.'};
+    }
+  }
+
 }
