@@ -692,7 +692,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                 children: [
                   // 👇 CORREÇÃO APLICADA AQUI 👇
                   // Agora verificamos por 'pending' (em inglês)
-                  if (appointment.status == 'pending')
+                  if (appointment.status.toLowerCase() == 'pendente')
                     SizedBox(
                       width: 32,
                       height: 32,
@@ -712,7 +712,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
 
                   // 👇 CORREÇÃO APLICADA AQUI 👇
                   // Verificação para o botão de cancelar
-                  if (appointment.status != 'cancelled')
+                  if (appointment.status.toLowerCase() != 'cancelled')
                     SizedBox(
                       width: 32,
                       height: 32,
@@ -735,7 +735,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                     width: 32,
                     height: 32,
                     child: IconButton(
-                      onPressed: () => _editAppointment(appointment.id),
+                      onPressed: () => _showEditAppointmentDialog(appointment),
                       icon: const Icon(
                         Icons.edit,
                         size: 16,
@@ -1257,18 +1257,165 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
 
   // Em _SecretaryDashboardState
 
-  void _editAppointment(int appointmentId) {
-    // Navega para a tela de edição, passando o ID da consulta
-    Navigator.pushNamed(
-      context,
-      '/edit-appointment', // Garanta que esta rota existe no seu main.dart
-      arguments: appointmentId,
-    ).then((_) {
-      // Este código é executado quando você VOLTA da tela de edição,
-      // garantindo que a lista de consultas seja atualizada.
-      _loadInitialData();
-    });
+  // Em _SecretaryDashboardState
+
+  // SUBSTITUA a função _editAppointment por esta
+  // Em _SecretaryDashboardState
+
+  void _editAppointment(Appointment appointment) {
+    // Guarda os valores iniciais da data e hora da consulta
+    DateTime selectedDate = appointment.dateTime;
+    TimeOfDay selectedTime = TimeOfDay.fromDateTime(appointment.dateTime);
+    bool isDialogLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Remarcar Consulta'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Paciente: ${appointment.patientName}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text('Médico: ${appointment.doctorName}'),
+                  const SizedBox(height: 24),
+                  const Text('Selecione a nova data e hora:'),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.calendar_today),
+                          label: Text(
+                            DateFormat('dd/MM/yyyy').format(selectedDate),
+                          ),
+                          onPressed: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (date != null) {
+                              setDialogState(() => selectedDate = date);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.access_time),
+                          label: Text(selectedTime.format(context)),
+                          onPressed: () async {
+                            final time = await showTimePicker(
+                              context: context,
+                              initialTime: selectedTime,
+                            );
+                            if (time != null) {
+                              setDialogState(() => selectedTime = time);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          setDialogState(() => isDialogLoading = true);
+                          try {
+                            final accessToken = await _storage.read(
+                              key: 'access_token',
+                            );
+                            if (accessToken == null)
+                              throw Exception('Token não encontrado');
+
+                            final newDateTime = DateTime(
+                              selectedDate.year,
+                              selectedDate.month,
+                              selectedDate.day,
+                              selectedTime.hour,
+                              selectedTime.minute,
+                            );
+
+                            final response = await _apiService
+                                .updateAppointment(
+                                  appointment.id,
+                                  newDateTime,
+                                  accessToken,
+                                );
+
+                            if (!mounted) return;
+                            if (response.statusCode == 200) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Consulta remarcada com sucesso!',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _loadInitialData(); // Atualiza a lista
+                            } else {
+                              throw Exception(
+                                'Falha ao remarcar: ${response.body}',
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted)
+                              setDialogState(() => isDialogLoading = false);
+                          }
+                        },
+                  child: isDialogLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Salvar Alterações'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
+
+  // E não se esqueça de ajustar a chamada no _buildAppointmentCard
+  // para passar o objeto `appointment` inteiro:
+  // onPressed: () => _editAppointment(appointment),
 
   //_buildCancelDialog
   Widget _buildCancelDialog() {

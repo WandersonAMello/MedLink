@@ -324,20 +324,25 @@ class ApiService {
   }
 
   /// Envia uma requisição PUT para atualizar (remarcar) uma consulta.
+  // Em lib/services/api_service.dart
+
+  /// Envia uma requisição PUT/PATCH para atualizar (remarcar) uma consulta.
   Future<http.Response> updateAppointment(
     int appointmentId,
     DateTime newDateTime,
     String accessToken,
   ) async {
-    final url = Uri.parse(
-      "$baseUrl/api/agendamentos/$appointmentId/",
-    ); // Rota principal de agendamento
+    // 👇 CORREÇÃO: A URL agora aponta para a rota genérica de agendamentos, que aceita PUT/PATCH
+    final url = Uri.parse("$baseUrl/api/agendamentos/$appointmentId/");
+
+    // Usando PATCH, que é mais adequado para atualizar apenas um campo (data_hora)
     return await http.put(
       url,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
+      // O backend espera o campo 'data_hora' no formato ISO 8601
       body: jsonEncode({'data_hora': newDateTime.toIso8601String()}),
     );
   }
