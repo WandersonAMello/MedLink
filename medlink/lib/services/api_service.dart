@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'; // Importado para usar debugPrint
 import 'package:http/http.dart' as http;
 
 import 'package:medlink/views/pages/admin.dart';
@@ -47,7 +47,7 @@ class ApiService {
         };
       }
     } catch (e) {
-      print('Erro na chamada de login: $e');
+      debugPrint('Erro na chamada de login: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -63,7 +63,7 @@ class ApiService {
       final payloadMap = json.decode(resp);
       return payloadMap['user_type'];
     } catch (e) {
-      print('Erro ao decodificar token: $e');
+      debugPrint('Erro ao decodificar token: $e');
       return null;
     }
   }
@@ -88,8 +88,8 @@ class ApiService {
       }),
     );
 
-    print("Status: ${response.statusCode}");
-    print("Body: ${response.body}");
+    debugPrint("Status: ${response.statusCode}");
+    debugPrint("Body: ${response.body}");
 
     return response.statusCode == 201;
   }
@@ -192,7 +192,6 @@ class ApiService {
     }
   }
 
-  // --- 👇 NOVO MÉTODO ADICIONADO AQUI 👇 ---
   Future<Map<String, List<dynamic>>> getMedicoAgenda(
     int year,
     int month,
@@ -323,16 +322,12 @@ class ApiService {
     );
   }
 
-  /// Envia uma requisição PUT para atualizar (remarcar) uma consulta.
-  // Em lib/services/api_service.dart
-
   /// Envia uma requisição PUT/PATCH para atualizar (remarcar) uma consulta.
   Future<http.Response> updateAppointment(
     int appointmentId,
     DateTime newDateTime,
     String accessToken,
   ) async {
-    // 👇 CORREÇÃO: A URL agora aponta para a rota genérica de agendamentos, que aceita PUT/PATCH
     final url = Uri.parse("$baseUrl/api/agendamentos/$appointmentId/");
 
     // Usando PATCH, que é mais adequado para atualizar apenas um campo (data_hora)
@@ -347,7 +342,6 @@ class ApiService {
     );
   }
 
-  // 👇 ADICIONE ESTE NOVO MÉTODO 👇
   Future<bool> finalizarConsulta(int consultaId, String conteudo) async {
     final url = Uri.parse("$baseUrl/api/agendamentos/$consultaId/finalizar/");
     if (_accessToken == null) throw Exception('Token não encontrado.');
@@ -366,7 +360,6 @@ class ApiService {
 
   // ✅ ADMIN (Usuários da Clínica)
   Future<List<AdminUser>> getClinicUsers(String accessToken) async {
-    // 👇 CORREÇÃO: O caminho completo /api/admin/users/ é construído aqui
     final url = Uri.parse("$baseUrl/api/admin/users/");
 
     final response = await http.get(
@@ -511,9 +504,9 @@ class ApiService {
     );
   }
   Future<Map<String, dynamic>> requestPasswordReset(String email) async {
-    // Ajuste a URL para o seu endpoint real de "request-password-reset"
-    final url = Uri.parse('$baseUrl/api/users/request-password-reset/'); 
-    
+    // Agora '$baseUrl' funciona porque está dentro da classe
+    final url = Uri.parse('$baseUrl/api/users/request-password-reset/');
+
     try {
       final response = await http.post(
         url,
@@ -535,16 +528,17 @@ class ApiService {
         }
       }
     } catch (e) {
-      // Erro de conexão
-      print('Erro de conexão em requestPasswordReset: $e');
+      
+      debugPrint('Erro de conexão em requestPasswordReset: $e');
       return {'success': false, 'message': 'Não foi possível conectar ao servidor. Verifique sua internet.'};
     }
   }
 
-Future<Map<String, dynamic>> confirmPasswordReset(String uid, String token, String password) async {
+  Future<Map<String, dynamic>> confirmPasswordReset(String uid, String token, String password) async {
     
-    final url = Uri.parse('$baseUrl/api/users/reset-password-confirm/'); 
-    
+    // Agora '$baseUrl' funciona porque está dentro da classe
+    final url = Uri.parse('$baseUrl/api/users/reset-password-confirm/');
+
     try {
       final response = await http.post(
         url,
@@ -566,13 +560,13 @@ Future<Map<String, dynamic>> confirmPasswordReset(String uid, String token, Stri
           // Pega a primeira mensagem de erro
           String errorMessage = "Token inválido ou expirado.";
           if (responseBody is Map) {
-             // Ex: {'password': ['erro...']} ou {'detail': 'erro...'}
-             final errors = responseBody.values.first;
-             if (errors is List) {
-               errorMessage = errors.first;
-             } else {
-               errorMessage = errors.toString();
-             }
+            // Ex: {'password': ['erro...']} ou {'detail': 'erro...'}
+            final errors = responseBody.values.first;
+            if (errors is List) {
+              errorMessage = errors.first;
+            } else {
+              errorMessage = errors.toString();
+            }
           }
           return {'success': false, 'message': errorMessage};
         } catch (e) {
@@ -580,10 +574,32 @@ Future<Map<String, dynamic>> confirmPasswordReset(String uid, String token, Stri
         }
       }
     } catch (e) {
-      // Erro de conexão
-      print('Erro de conexão em confirmPasswordReset: $e');
+      debugPrint('Erro de conexão em confirmPasswordReset: $e');
       return {'success': false, 'message': 'Não foi possível conectar ao servidor.'};
     }
   }
 
-}
+  Future<Map<String, dynamic>> createPasswordConfirm(String uid, String token, String password) async {
+    final response = await http.post(
+      
+      
+      Uri.parse('$baseUrl/api/users/create-password-confirm/'),
+      
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        'uid': uid,
+        'token': token,
+        'password': password,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return {'success': true, 'message': 'Senha definida com sucesso.'};
+    } else {
+      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+      return {'success': false, 'message': errorData['error'] ?? 'Link inválido ou expirado'};
+    }
+  }
+} 

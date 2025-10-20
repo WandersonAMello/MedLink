@@ -19,6 +19,12 @@ from .serializers import (
     LogEntrySerializer
 )
 
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.core.mail import send_mail
+from django.conf import settings
+
 class AdminUserViewSet(viewsets.ModelViewSet):
     """
     Endpoint da API para administradores gerirem todos os utilizadores do sistema.
@@ -73,6 +79,9 @@ class AdminUserViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError({"detail": "A Clínica é obrigatória para o perfil de Secretária."})
 
                     Secretaria.objects.create(user=user, clinica_id=clinica_id)
+
+                if user.user_type in [User.UserType.MEDICO, User.UserType.SECRETARIA]:
+                   self.send_creation_email(user)
                 
                 LogEntry.objects.create(
                     actor=self.request.user,
@@ -82,7 +91,27 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         except Exception as e:
             user.delete()
             raise serializers.ValidationError({"detail": f"Falha ao criar perfil associado: {str(e)}"})
+    def send_creation_email(self, user):
+        """
+        Gera o token e envia o e-mail para o novo usuário criar sua senha.
+        """
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        
+        create_url = f'http://localhost:3000/criar-senha?uid={uid}&token={token}' 
 
+        try:
+            send_mail(
+                'Bem-vindo(a) à MedLink - Crie sua Senha',
+                f'Olá {user.first_name},\n\nSua conta na MedLink foi criada com sucesso. Por favor, clique no link abaixo para definir sua senha de acesso:\n\n{create_url}\n\nSe você não esperava por isso, ignore este e-mail.',
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+        
+            print(f"Erro ao enviar email de criação de senha: {e}")
+            pass
     def perform_update(self, serializer):
         """ Sobrescreve para adicionar log na atualização. """
         user = serializer.save()

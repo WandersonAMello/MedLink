@@ -1,3 +1,5 @@
+// medlink/lib/main.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -14,6 +16,7 @@ import 'views/pages/admin_edit_user_page.dart';
 import 'views/pages/medico_dashboard_page.dart';
 import 'views/pages/medico_agenda_page.dart';
 import 'views/pages/reset_password_page.dart';
+import 'package:medlink/views/pages/create_password_page.dart';
 
 // Controllers
 import 'controllers/paciente_controller.dart';
@@ -131,7 +134,29 @@ class MyApp extends StatelessWidget {
             }
           }
         }
-      
+        
+        // Rota para /criar-senha?uid=...&token=...
+        if (settings.name != null && settings.name!.startsWith('/criar-senha')) {
+          final uri = Uri.parse(settings.name!);
+
+          // Verifica se o caminho base é /criar-senha
+          if (uri.path == '/criar-senha') {
+            
+            // Pega os parâmetros da query (o que vem depois do '?')
+            final uid = uri.queryParameters['uid'];
+            final token = uri.queryParameters['token'];
+
+            // Se encontrou os dois, navega para a página
+            if (uid != null && token != null) {
+              return GetPageRoute(
+                settings: settings,
+                // Chama a nova página que você já importou
+                page: () => CreatePasswordPage(uid: uid, token: token),
+              );
+            }
+          }
+        }
+
         // Se nenhuma rota bater, retorna para a página de Login
         return GetPageRoute(
           settings: settings,

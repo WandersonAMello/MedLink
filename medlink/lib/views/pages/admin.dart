@@ -879,7 +879,6 @@ class _AdminDashboardState extends State<AdminDashboard>
     final lastNameController = TextEditingController();
     final cpfController = TextEditingController();
     final emailController = TextEditingController();
-    final passwordController = TextEditingController();
     final clinicaIdController = TextEditingController();
     final crmController = TextEditingController();
     final especialidadeController = TextEditingController();
@@ -923,12 +922,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                       TextFormField(
                         controller: emailController,
                         decoration: const InputDecoration(labelText: 'E-mail'),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: passwordController,
-                        decoration: const InputDecoration(labelText: 'Senha'),
-                        obscureText: true,
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<UserRole>(
@@ -1011,7 +1004,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                               "email": emailController.text,
                               "first_name": firstNameController.text,
                               "last_name": lastNameController.text,
-                              "password": passwordController.text,
                               "user_type": selectedRole.name.toUpperCase(),
                             };
 

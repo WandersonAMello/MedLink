@@ -31,7 +31,7 @@ class PasswordResetRequestView(APIView):
 
         try:
             # Busca o usuário pelo email
-            user = User.objects.get(email=email)
+            user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             return Response({'error': 'Usuário com este email não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -86,11 +86,11 @@ class PasswordResetConfirmView(APIView):
 
         # Verifica se o usuário existe e se o token é válido
         if user is not None and default_token_generator.check_token(user, token):
-            if user.check_password(password):
-                return Response(
-                    {'error': 'A nova senha não pode ser igual à senha antiga.'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # Define a senha E ativa o usuário
+            user.set_password(password)
+            user.is_active = True  # <-- ADICIONE ESTA LINHA
+            user.save()
+            return Response({'message': 'Senha definida com sucesso.'}, status=status.HTTP_200_OK)
             # Se tudo estiver OK, define a nova senha
             user.set_password(password)
             user.save()
@@ -98,3 +98,32 @@ class PasswordResetConfirmView(APIView):
         else:
             # Se o token for inválido ou o UID estiver errado
             return Response({'error': 'O link de redefinição é inválido ou expirou.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+class PasswordCreateConfirmView(APIView):
+    """
+    View para o usuário DEFINIR a senha pela primeira vez.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        uidb64 = request.data.get('uid')
+        token = request.data.get('token')
+        password = request.data.get('password')
+
+        if not uidb64 or not token or not password:
+            return Response({'error': 'UID, token e nova senha são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        # Verifica se o usuário existe e se o token é válido
+        if user is not None and default_token_generator.check_token(user, token):
+            # A única diferença: NÃO verificamos a senha antiga.
+            user.set_password(password)
+            user.save()
+            return Response({'message': 'Senha definida com sucesso.'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'O link para criar a senha é inválido ou expirou.'}, status=status.HTTP_400_BAD_REQUEST)

@@ -9,7 +9,8 @@ class CustomUserManager(BaseUserManager):
     Manager customizado para o nosso modelo de User onde o CPF é o identificador
     único para autenticação em vez de usernames.
     """
-    def create_user(self, cpf, email, password, **extra_fields):
+    # DEPOIS (adicionando =None)
+    def create_user(self, cpf, email, password=None, **extra_fields):
         if not cpf:
             raise ValueError(_('O CPF deve ser fornecido'))
         if not email:
@@ -17,7 +18,11 @@ class CustomUserManager(BaseUserManager):
 
         email = self.normalize_email(email)
         user = self.model(cpf=cpf, email=email, **extra_fields)
-        user.set_password(password)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+            
         user.save(using=self._db)
         return user
 
@@ -31,6 +36,9 @@ class CustomUserManager(BaseUserManager):
             raise ValueError(_('Superuser must have is_staff=True.'))
         if extra_fields.get('is_superuser') is not True:
             raise ValueError(_('Superuser must have is_superuser=True.'))
+        if not password:
+            raise ValueError(_('Superuser must have a password.'))
+            
         return self.create_user(cpf, email, password, **extra_fields)
 
 
