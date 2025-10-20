@@ -123,7 +123,9 @@ class ApiService {
   }
 
   // --- NOVO MÉTODO ADICIONADO AQUI ---
-  Future<List<consultas_model.Consulta>> getHistoricoConsultas(int pacienteId) async {
+  Future<List<consultas_model.Consulta>> getHistoricoConsultas(
+    int pacienteId,
+  ) async {
     final url = Uri.parse("$baseUrl/api/pacientes/$pacienteId/historico/");
 
     if (_accessToken == null) {
@@ -140,20 +142,25 @@ class ApiService {
 
     if (response.statusCode == 200) {
       final List<dynamic> body = jsonDecode(utf8.decode(response.bodyBytes));
-      return body.map((json) => consultas_model.Consulta.fromJson(json)).toList();
+      return body
+          .map((json) => consultas_model.Consulta.fromJson(json))
+          .toList();
     } else {
       throw Exception('Falha ao carregar o histórico: ${response.statusCode}');
     }
   }
 
   // --- NOVOS MÉTODOS PARA ANOTAÇÕES ---
-  
+
   // Busca a anotação de uma consulta específica
   Future<String?> getAnotacao(int consultaId) async {
     final url = Uri.parse("$baseUrl/api/agendamentos/$consultaId/anotacao/");
     if (_accessToken == null) return null;
 
-    final response = await http.get(url, headers: {"Authorization": "Bearer $_accessToken"});
+    final response = await http.get(
+      url,
+      headers: {"Authorization": "Bearer $_accessToken"},
+    );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -186,8 +193,13 @@ class ApiService {
   }
 
   // --- 👇 NOVO MÉTODO ADICIONADO AQUI 👇 ---
-  Future<Map<String, List<dynamic>>> getMedicoAgenda(int year, int month) async {
-    final url = Uri.parse("$baseUrl/api/medicos/agenda/?year=$year&month=$month");
+  Future<Map<String, List<dynamic>>> getMedicoAgenda(
+    int year,
+    int month,
+  ) async {
+    final url = Uri.parse(
+      "$baseUrl/api/medicos/agenda/?year=$year&month=$month",
+    );
 
     if (_accessToken == null) {
       throw Exception('Token de acesso não encontrado.');
@@ -203,11 +215,12 @@ class ApiService {
 
     if (response.statusCode == 200) {
       // O corpo da resposta é um mapa, então fazemos o decode diretamente
-      final Map<String, dynamic> body = jsonDecode(utf8.decode(response.bodyBytes));
-      
+      final Map<String, dynamic> body = jsonDecode(
+        utf8.decode(response.bodyBytes),
+      );
+
       // Convertemos as chaves de String para DateTime para usar no calendário
       return body.map((key, value) => MapEntry(key, value as List<dynamic>));
-
     } else {
       throw Exception('Falha ao carregar a agenda: ${response.statusCode}');
     }
@@ -273,28 +286,32 @@ class ApiService {
       body: jsonEncode(appointment.toJson()),
     );
   }
+  // Em lib/services/api_service.dart
 
+  // --- MÉTODOS DE AÇÃO PARA AGENDAMENTOS ---
+
+  /// Envia uma requisição PATCH para confirmar uma consulta.
   Future<http.Response> confirmAppointment(
     int appointmentId,
     String accessToken,
   ) async {
-    final url = Uri.parse("$baseUrl/api/consultas/$appointmentId/confirmar/");
+    final url = Uri.parse(
+      "$baseUrl/api/secretarias/consultas/$appointmentId/confirmar/",
+    );
     return await http.patch(
       url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
-      body: jsonEncode({'status_atual': 'confirmada'}),
+      headers: {'Authorization': 'Bearer $accessToken'},
     );
   }
 
-  Future<http.Response> confirmAppointmentByObject(
-    Appointment appointment,
+  /// Envia uma requisição PATCH para cancelar uma consulta, enviando um motivo.
+  Future<http.Response> cancelAppointment(
+    int appointmentId,
+    String reason,
     String accessToken,
   ) async {
     final url = Uri.parse(
-      "$baseUrl/api/consultas/${appointment.id}/confirmar/",
+      "$baseUrl/api/secretarias/consultas/$appointmentId/cancelar/",
     );
     return await http.patch(
       url,
@@ -302,11 +319,35 @@ class ApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-      body: jsonEncode(appointment.toJson()),
+      body: jsonEncode({'motivo': reason}),
     );
   }
 
-   // 👇 ADICIONE ESTE NOVO MÉTODO 👇
+  /// Envia uma requisição PUT para atualizar (remarcar) uma consulta.
+  // Em lib/services/api_service.dart
+
+  /// Envia uma requisição PUT/PATCH para atualizar (remarcar) uma consulta.
+  Future<http.Response> updateAppointment(
+    int appointmentId,
+    DateTime newDateTime,
+    String accessToken,
+  ) async {
+    // 👇 CORREÇÃO: A URL agora aponta para a rota genérica de agendamentos, que aceita PUT/PATCH
+    final url = Uri.parse("$baseUrl/api/agendamentos/$appointmentId/");
+
+    // Usando PATCH, que é mais adequado para atualizar apenas um campo (data_hora)
+    return await http.put(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      // O backend espera o campo 'data_hora' no formato ISO 8601
+      body: jsonEncode({'data_hora': newDateTime.toIso8601String()}),
+    );
+  }
+
+  // 👇 ADICIONE ESTE NOVO MÉTODO 👇
   Future<bool> finalizarConsulta(int consultaId, String conteudo) async {
     final url = Uri.parse("$baseUrl/api/agendamentos/$consultaId/finalizar/");
     if (_accessToken == null) throw Exception('Token não encontrado.');

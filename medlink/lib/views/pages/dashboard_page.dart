@@ -41,6 +41,8 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
   bool _isLoading = true;
   String _secretaryName = 'Secretária'; // Nome padrão
   String _searchTerm = '';
+  Appointment? _selectedAppointment;
+  String _cancelReason = '';
 
   // Constantes de Cor
   static const Color primaryColor = Color(0xFF0891B2);
@@ -145,6 +147,215 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
   }
 
   // ... (Suas funções _confirmAppointment, _cancelAppointment, _editAppointment, etc., viriam aqui)
+  // Em _SecretaryDashboardState
+
+  // --- FUNÇÕES DE AÇÃO DOS BOTÕES ---
+
+  /// Confirma uma consulta pendente.
+  Future<void> _confirmAppointment(int appointmentId) async {
+    try {
+      final accessToken = await _storage.read(key: 'access_token');
+      if (accessToken == null) throw Exception('Token não encontrado');
+
+      final response = await _apiService.confirmAppointment(
+        appointmentId,
+        accessToken,
+      );
+
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Consulta confirmada com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadInitialData(); // Atualiza a lista
+      } else {
+        throw Exception('Falha ao confirmar consulta: ${response.body}');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  /// Abre o dialog para cancelar uma consulta.
+  void _showCancelDialog(Appointment appointment) {
+    _selectedAppointment = appointment;
+    _cancelReason = '';
+    showDialog(context: context, builder: (context) => _buildCancelDialog());
+  }
+
+  /// Cancela a consulta selecionada.
+  Future<void> _cancelAppointment() async {
+    if (_selectedAppointment == null) return;
+    try {
+      final accessToken = await _storage.read(key: 'access_token');
+      if (accessToken == null) throw Exception('Token não encontrado');
+
+      final response = await _apiService.cancelAppointment(
+        _selectedAppointment!.id,
+        _cancelReason,
+        accessToken,
+      );
+
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        Navigator.pop(context); // Fecha o dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Consulta cancelada com sucesso!'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+        _loadInitialData();
+      } else {
+        throw Exception('Falha ao cancelar consulta: ${response.body}');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  /// Abre o modal para editar (remarcar) uma consulta.
+  void _showEditAppointmentDialog(Appointment appointment) {
+    DateTime? selectedDate = appointment.dateTime;
+    TimeOfDay? selectedTime = TimeOfDay.fromDateTime(appointment.dateTime);
+    bool isDialogLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Remarcar Consulta'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Paciente: ${appointment.patientName}'),
+                  Text('Médico: ${appointment.doctorName}'),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.calendar_today),
+                          label: Text(
+                            DateFormat('dd/MM/yyyy').format(selectedDate!),
+                          ),
+                          onPressed: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate!,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (date != null)
+                              setDialogState(() => selectedDate = date);
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.access_time),
+                          label: Text(selectedTime!.format(context)),
+                          onPressed: () async {
+                            final time = await showTimePicker(
+                              context: context,
+                              initialTime: selectedTime!,
+                            );
+                            if (time != null)
+                              setDialogState(() => selectedTime = time);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          setDialogState(() => isDialogLoading = true);
+                          try {
+                            final accessToken = await _storage.read(
+                              key: 'access_token',
+                            );
+                            if (accessToken == null)
+                              throw Exception('Token não encontrado');
+
+                            final newDateTime = DateTime(
+                              selectedDate!.year,
+                              selectedDate!.month,
+                              selectedDate!.day,
+                              selectedTime!.hour,
+                              selectedTime!.minute,
+                            );
+
+                            final response = await _apiService
+                                .updateAppointment(
+                                  appointment.id,
+                                  newDateTime,
+                                  accessToken,
+                                );
+
+                            if (!mounted) return;
+                            if (response.statusCode == 200) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Consulta remarcada com sucesso!',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _loadInitialData();
+                            } else {
+                              throw Exception(
+                                'Falha ao remarcar: ${response.body}',
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted)
+                              setDialogState(() => isDialogLoading = false);
+                          }
+                        },
+                  child: isDialogLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
   // ... (Elas devem chamar a API e, no final, chamar _loadInitialData() para atualizar a tela)
 
   String get _todayFormatted {
@@ -411,56 +622,151 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     );
   }
 
-  // Em _SecretaryDashboardState
+  // Em _SecretaryDashboardState, substitua apenas este método
+
   Widget _buildAppointmentCard(Appointment appointment) {
-    final statusColor = appointment.status == 'confirmed'
-        ? Colors.green
-        : Colors.orange;
+    // A lógica de decisão de cor e texto agora fica aqui
+    String statusLabel;
+    Color statusColor;
+
+    switch (appointment.status) {
+      case 'pending':
+        statusLabel = 'Pendente';
+        statusColor = Colors.orange;
+        break;
+      case 'confirmed':
+        statusLabel = 'Confirmada';
+        statusColor = Colors.green;
+        break;
+      case 'cancelled':
+        statusLabel = 'Cancelada';
+        statusColor = Colors.red;
+        break;
+      default:
+        statusLabel = appointment.status;
+        statusColor = Colors.grey;
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      // ... (o resto do seu Container)
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+      ),
       child: Row(
         children: [
-          Column(
-            children: [
-              const Icon(Icons.access_time, color: primaryColor, size: 16),
-              const SizedBox(height: 4),
-              // CORRIGIDO: Usa o novo campo `dateTime`
-              Text(
-                DateFormat.Hm().format(appointment.dateTime),
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 16),
+          // ... (Sua coluna de Hora, Paciente, Médico - já estão corretas)
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // CORRIGIDO: Usa o novo campo `patientName`
                 Text(
-                  appointment.patientName,
+                  DateFormat('HH:mm').format(appointment.dateTime),
                   style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                // CORRIGIDO: Usa o novo campo `doctorName`
+                const SizedBox(height: 8),
                 Text(
-                  appointment.doctorName,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  'Paciente: ${appointment.patientName}',
+                  style: const TextStyle(fontSize: 14),
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  appointment.type,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  'Médico: ${appointment.doctorName}',
+                  style: const TextStyle(fontSize: 14),
                 ),
               ],
             ),
           ),
-          // ... (o resto do seu card com os botões e o badge de status)
+
+          // Coluna de Ações e Status
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 👇 CORREÇÃO APLICADA AQUI 👇
+                  // Agora verificamos por 'pending' (em inglês)
+                  if (appointment.status.toLowerCase() == 'pendente')
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: IconButton(
+                        onPressed: () => _confirmAppointment(appointment.id),
+                        icon: const Icon(
+                          Icons.check,
+                          size: 16,
+                          color: Colors.green,
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.green[50],
+                          side: BorderSide(color: Colors.green[200]!),
+                        ),
+                      ),
+                    ),
+
+                  // 👇 CORREÇÃO APLICADA AQUI 👇
+                  // Verificação para o botão de cancelar
+                  if (appointment.status.toLowerCase() != 'cancelled')
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: IconButton(
+                        onPressed: () => _showCancelDialog(appointment),
+                        icon: const Icon(
+                          Icons.close,
+                          size: 16,
+                          color: Colors.red,
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.red[50],
+                          side: BorderSide(color: Colors.red[200]!),
+                        ),
+                      ),
+                    ),
+
+                  // Botão de Editar (sempre aparece)
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: IconButton(
+                      onPressed: () => _showEditAppointmentDialog(appointment),
+                      icon: const Icon(
+                        Icons.edit,
+                        size: 16,
+                        color: Colors.blue,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.blue[50],
+                        side: BorderSide(color: Colors.blue[200]!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  statusLabel, // Mostra o texto em português para o usuário
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -686,7 +992,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                               type: typeController.text,
                               patientId: selectedPatient!.id,
                               doctorId: selectedDoctor!.id,
-                              clinicId: 1, // TODO: Pegar o ID da clínica logada
+                              clinicId: 4, // TODO: Pegar o ID da clínica logada
                             );
 
                             final response = await _apiService
@@ -790,7 +1096,6 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
       _loadInitialData();
     });
   }
-
   // Em _SecretaryDashboardState
 
   void _showNewPatientDialog() {
@@ -799,9 +1104,6 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
     final cpfController = TextEditingController();
     final emailController = TextEditingController();
     final telefoneController = TextEditingController();
-    // Para pacientes, não precisamos de senha no formulário da secretária
-    // O backend pode gerar uma senha inicial ou um link para definição de senha.
-
     bool isDialogLoading = false;
 
     showDialog(
@@ -823,16 +1125,23 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                         decoration: const InputDecoration(
                           labelText: 'Nome Completo',
                         ),
+                        validator: (v) =>
+                            v!.isEmpty ? 'Campo obrigatório' : null,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: cpfController,
                         decoration: const InputDecoration(labelText: 'CPF'),
+                        validator: (v) =>
+                            v!.isEmpty ? 'Campo obrigatório' : null,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: emailController,
                         decoration: const InputDecoration(labelText: 'E-mail'),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) =>
+                            v!.isEmpty ? 'Campo obrigatório' : null,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -840,6 +1149,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                         decoration: const InputDecoration(
                           labelText: 'Telefone',
                         ),
+                        keyboardType: TextInputType.phone,
                       ),
                     ],
                   ),
@@ -866,19 +1176,29 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                             if (accessToken == null)
                               throw Exception('Token não encontrado');
 
-                            // Monta o JSON para criar um usuário do tipo PACIENTE
+                            // Separa nome e sobrenome para enviar para a API de admin
+                            final nomeCompleto = nomeController.text.split(' ');
+                            final firstName = nomeCompleto.isNotEmpty
+                                ? nomeCompleto.first
+                                : '';
+                            final lastName = nomeCompleto.length > 1
+                                ? nomeCompleto.sublist(1).join(' ')
+                                : '';
+
                             final userData = {
-                              "nome_completo": nomeController.text,
+                              "first_name": firstName,
+                              "last_name": lastName,
                               "cpf": cpfController.text,
                               "email": emailController.text,
                               "telefone": telefoneController.text,
                               "user_type": "PACIENTE",
-                              // A API do backend deve ser responsável por gerar uma senha padrão
-                              // ou enviar um link de redefinição de senha para o novo paciente.
+                              // A senha pode ser gerada pelo backend ou podemos enviar uma padrão
+                              "password": cpfController.text.replaceAll(
+                                RegExp(r'[^0-9]'),
+                                '',
+                              ),
                             };
 
-                            // Reutilizamos o método createClinicUser, pois ele cria qualquer tipo de usuário
-                            // TODO: Talvez renomear para `createUser` no ApiService para ficar mais genérico
                             final response = await _apiService.createPatient(
                               userData,
                               accessToken,
@@ -893,7 +1213,7 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
                                   backgroundColor: Colors.green,
                                 ),
                               );
-                              _loadInitialData(); // Atualiza a lista de pacientes para o dropdown
+                              _loadInitialData(); // Atualiza a lista de pacientes
                             } else {
                               final error = jsonDecode(
                                 utf8.decode(response.bodyBytes),
@@ -929,6 +1249,230 @@ class _SecretaryDashboardState extends State<SecretaryDashboard> {
               ],
             );
           },
+        );
+      },
+    );
+  }
+  // Em _SecretaryDashboardState
+
+  // Em _SecretaryDashboardState
+
+  // Em _SecretaryDashboardState
+
+  // SUBSTITUA a função _editAppointment por esta
+  // Em _SecretaryDashboardState
+
+  void _editAppointment(Appointment appointment) {
+    // Guarda os valores iniciais da data e hora da consulta
+    DateTime selectedDate = appointment.dateTime;
+    TimeOfDay selectedTime = TimeOfDay.fromDateTime(appointment.dateTime);
+    bool isDialogLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Remarcar Consulta'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Paciente: ${appointment.patientName}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text('Médico: ${appointment.doctorName}'),
+                  const SizedBox(height: 24),
+                  const Text('Selecione a nova data e hora:'),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.calendar_today),
+                          label: Text(
+                            DateFormat('dd/MM/yyyy').format(selectedDate),
+                          ),
+                          onPressed: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (date != null) {
+                              setDialogState(() => selectedDate = date);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.access_time),
+                          label: Text(selectedTime.format(context)),
+                          onPressed: () async {
+                            final time = await showTimePicker(
+                              context: context,
+                              initialTime: selectedTime,
+                            );
+                            if (time != null) {
+                              setDialogState(() => selectedTime = time);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isDialogLoading
+                      ? null
+                      : () async {
+                          setDialogState(() => isDialogLoading = true);
+                          try {
+                            final accessToken = await _storage.read(
+                              key: 'access_token',
+                            );
+                            if (accessToken == null)
+                              throw Exception('Token não encontrado');
+
+                            final newDateTime = DateTime(
+                              selectedDate.year,
+                              selectedDate.month,
+                              selectedDate.day,
+                              selectedTime.hour,
+                              selectedTime.minute,
+                            );
+
+                            final response = await _apiService
+                                .updateAppointment(
+                                  appointment.id,
+                                  newDateTime,
+                                  accessToken,
+                                );
+
+                            if (!mounted) return;
+                            if (response.statusCode == 200) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Consulta remarcada com sucesso!',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _loadInitialData(); // Atualiza a lista
+                            } else {
+                              throw Exception(
+                                'Falha ao remarcar: ${response.body}',
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted)
+                              setDialogState(() => isDialogLoading = false);
+                          }
+                        },
+                  child: isDialogLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Salvar Alterações'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // E não se esqueça de ajustar a chamada no _buildAppointmentCard
+  // para passar o objeto `appointment` inteiro:
+  // onPressed: () => _editAppointment(appointment),
+
+  //_buildCancelDialog
+  Widget _buildCancelDialog() {
+    bool isDialogLoading = false;
+
+    return StatefulBuilder(
+      builder: (context, setDialogState) {
+        return AlertDialog(
+          title: const Text('Cancelar Agendamento'),
+          content: TextField(
+            onChanged: (value) => _cancelReason = value,
+            decoration: const InputDecoration(
+              labelText: 'Motivo do Cancelamento',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fechar'),
+            ),
+            ElevatedButton(
+              // In _buildCancelDialog
+
+              // ...
+              onPressed: isDialogLoading
+                  ? null
+                  : () async {
+                      if (_cancelReason.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Por favor, insira o motivo do cancelamento.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      setDialogState(() => isDialogLoading = true);
+                      // 👇 CORRECTION: Call the function with NO arguments 👇
+                      await _cancelAppointment();
+                      // The pop is handled inside _cancelAppointment on success/failure
+                    },
+
+              //...
+              child: isDialogLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Cancelar Agendamento'),
+            ),
+          ],
         );
       },
     );
