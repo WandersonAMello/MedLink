@@ -25,15 +25,33 @@ class AdminUserCreateUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'first_name', 'last_name', 'email', 'cpf', 
-            'user_type', 'password', 'is_active'
+            'user_type', 'is_active',
+            'password'
         ]
+        
+        # A senha agora é write_only e NÃO obrigatória.
         extra_kwargs = {
-            'password': {'write_only': True}
+            # 'required': False garante que não é obrigatório no payload
+            # 'allow_null': True é uma boa prática se você for enviar 'null'
+            'password': {'write_only': True, 'required': False, 'allow_null': True}
         }
 
     def create(self, validated_data):
-        # Chama o manager customizado para criar o utilizador com a senha hasheada
-        user = User.objects.create_user(**validated_data)
+        
+        cpf = validated_data.pop('cpf')
+        email = validated_data.pop('email')
+        
+        # Pega a senha, ou None se não for fornecida (graças ao 'required=False')
+        password = validated_data.pop('password', None)
+        
+        # O que sobrou em 'validated_data' (first_name, last_name, etc.)
+        # será passado como **extra_fields
+        user = User.objects.create_user(
+            cpf=cpf,
+            email=email,
+            password=password,
+            **validated_data
+        )
         return user
 
     def update(self, instance, validated_data):
